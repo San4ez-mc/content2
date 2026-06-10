@@ -11,7 +11,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { sessionKey, text, projectId } = body;
+  // sessionKey comes from query param (set in callbackUrl by chat/send)
+  // text and projectId come from flows body
+  const sessionKey = req.nextUrl.searchParams.get("sessionKey") || body.sessionKey || body.sessionId;
+  const projectId = req.nextUrl.searchParams.get("projectId") || body.projectId;
+  const text = body.text;
 
   // Save assistant message to DB
   const session = await prisma.chatSession.findUnique({
