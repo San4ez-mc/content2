@@ -14,8 +14,13 @@ interface PostItem {
   orderIndex: number;
   content: string | null;
   imagePath: string | null;
+  imagePrompt: string | null;
+  imageType: string | null;
   isCta: boolean;
   generationStatus: string;
+  generationError: string | null;
+  slideTitle: string | null;
+  slideSubtitle: string | null;
 }
 
 interface PostGroup {

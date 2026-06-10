@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { broadcastToProject } from "../../sse/project/[id]/route";
+import { broadcastToProject } from "@/lib/sse";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 
@@ -11,58 +11,62 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { postItemId, postGroupId, status, imagePath, errorMessage } = body;
+  const { postItemId, status, imagePath, errorMessage } = body;
 
-  if (postItemId) {
-    // Update post item generation status
-    const updated = await prisma.postItem.update({
-      where: { id: postItemId },
-      data: {
-        generationStatus: status, // 'generating' | 'done' | 'failed'
-        ...(imagePath ? { imagePath } : {}),
-        ...(errorMessage ? { generationError: errorMessage } : {}),
+  if (!postItemId) {
+    return NextResponse.json({ ok: false, error: "postItemId required" }, { status: 400 });
+  }
+
+  // Update post item generation status
+  const updated = await prisma.postItem.update({
+    where: { id: postItemId },
+    data: {
+      generationStatus: status, // 'generating' | 'done' | 'failed'
+      ...(imagePath ? { imagePath } : {}),
+      ...(errorMessage ? { generationError: errorMessage } : {}),
+    },
+    include: {
+      group: {
+        include: { socialNetwork: true },
       },
-      include: { group: { select: { projectId: true } } },
+    },
+  });
+
+  const projectId = updated.group.projectId;
+
+  // Notify via SSE
+  broadcastToProject(projectId, {
+    type: "generation_update",
+    postItemId,
+    postGroupId: updated.groupId,
+    status,
+    imagePath,
+    errorMessage,
+  });
+
+  // Create notification for all project users if done or failed
+  if (status === "done" || status === "failed") {
+    const projectUsers = await prisma.projectUser.findMany({
+      where: { projectId },
     });
 
-    // Notify via SSE
-    broadcastToProject(updated.group.projectId, {
-      type: "generation_update",
-      postItemId,
-      postGroupId: updated.groupId,
-      status,
-      imagePath,
-      errorMessage,
-    });
+    const networkName = updated.group.socialNetwork?.name ?? "Мережа";
+    const dateLabel = updated.group.postDate.toLocaleDateString("uk-UA");
 
-    // Create notification if done or failed
-    if (status === "done" || status === "failed") {
-      const group = await prisma.postGroup.findUnique({
-        where: { id: updated.groupId },
-        include: { projectUsers: { include: { user: true } }, socialNetwork: true },
+    for (const pu of projectUsers) {
+      await prisma.notification.create({
+        data: {
+          projectId,
+          userId: pu.userId,
+          type: status === "done" ? "generation_done" : "generation_failed",
+          title: status === "done" ? "✅ Зображення готове" : "❌ Помилка генерації",
+          body:
+            status === "done"
+              ? `Зображення для поста від ${dateLabel} (${networkName}) готове`
+              : `Помилка генерації: ${errorMessage || "невідома помилка"}`,
+          postGroupId: updated.groupId,
+        },
       });
-
-      if (group) {
-        // Get all project users to notify
-        const projectUsers = await prisma.projectUser.findMany({
-          where: { projectId: group.projectId },
-        });
-
-        for (const pu of projectUsers) {
-          await prisma.notification.create({
-            data: {
-              projectId: group.projectId,
-              userId: pu.userId,
-              type: status === "done" ? "generation_done" : "generation_failed",
-              title: status === "done" ? "✅ Зображення готове" : "❌ Помилка генерації",
-              body: status === "done"
-                ? `Зображення для поста від ${group.postDate.toLocaleDateString("uk-UA")} (${group.socialNetwork.name}) готове`
-                : `Помилка генерації: ${errorMessage || "невідома помилка"}`,
-              postGroupId: group.id,
-            },
-          });
-        }
-      }
     }
   }
 
