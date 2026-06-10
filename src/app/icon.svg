@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background rounded rect -->
+  <rect width="32" height="32" rx="8" fill="#0d1117"/>
+  <!-- Calendar grid lines -->
+  <rect x="6" y="10" width="20" height="16" rx="2" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+  <!-- Top bar of calendar -->
+  <rect x="6" y="10" width="20" height="5" rx="2" fill="#3b82f6"/>
+  <!-- Calendar dots/cells -->
+  <rect x="9" y="18" width="3" height="2.5" rx="0.5" fill="#3b82f6" opacity="0.7"/>
+  <rect x="14.5" y="18" width="3" height="2.5" rx="0.5" fill="#3b82f6" opacity="0.5"/>
+  <rect x="20" y="18" width="3" height="2.5" rx="0.5" fill="#3b82f6" opacity="0.3"/>
+  <rect x="9" y="22" width="3" height="2.5" rx="0.5" fill="#3b82f6" opacity="0.4"/>
+  <rect x="14.5" y="22" width="3" height="2.5" rx="0.5" fill="#3b82f6" opacity="0.7"/>
+  <!-- Hook/clip at top -->
+  <rect x="11" y="8" width="2" height="4" rx="1" fill="#3b82f6"/>
+  <rect x="19" y="8" width="2" height="4" rx="1" fill="#3b82f6"/>
+</svg>
