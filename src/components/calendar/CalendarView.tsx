@@ -131,9 +131,7 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
     if (!confirm(`Видалити ${bulkSelected.size} постів?`)) return;
     setBulkLoading(true);
     try {
-      for (const id of bulkSelected) {
-        await fetch(`/api/posts/${id}`, { method: "DELETE" });
-      }
+      await Promise.all(Array.from(bulkSelected).map((id) => fetch(`/api/posts/${id}`, { method: "DELETE" })));
       setBulkSelected(new Set());
       queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });
     } finally {
@@ -144,13 +142,15 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
   async function bulkStatus(status: string) {
     setBulkLoading(true);
     try {
-      for (const id of bulkSelected) {
-        await fetch(`/api/posts/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
-        });
-      }
+      await Promise.all(
+        Array.from(bulkSelected).map((id) =>
+          fetch(`/api/posts/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          })
+        )
+      );
       setBulkSelected(new Set());
       queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });
     } finally {
