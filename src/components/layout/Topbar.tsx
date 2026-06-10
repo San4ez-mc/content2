@@ -33,8 +33,8 @@ export function Topbar({ user }: Props) {
         <span className="text-xs font-display font-bold text-fg tracking-tight">CP2</span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex items-center gap-0.5 flex-1">
+      {/* Nav — hidden on mobile (use bottom MobileNav instead) */}
+      <nav className="hidden sm:flex items-center gap-0.5 flex-1">
         {NAV.map((item) => {
           const active =
             item.href === "/"

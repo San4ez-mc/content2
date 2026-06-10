@@ -138,7 +138,7 @@ export function ChatPanel() {
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl transition-all duration-200",
+          "fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-2xl flex items-center justify-center text-xl sm:text-2xl transition-all duration-200",
           open
             ? "bg-danger hover:bg-danger/80 text-white"
             : "bg-gradient-to-br from-accent to-accent-muted hover:scale-105 text-white"
