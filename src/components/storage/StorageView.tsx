@@ -77,9 +77,7 @@ export function StorageView({ projectId }: Props) {
   }
 
   async function deleteSelected() {
-    for (const id of selected) {
-      await fetch(`/api/media/${id}`, { method: "DELETE" });
-    }
+    await Promise.all(Array.from(selected).map((id) => fetch(`/api/media/${id}`, { method: "DELETE" })));
     setSelected(new Set());
     queryClient.invalidateQueries({ queryKey });
   }
