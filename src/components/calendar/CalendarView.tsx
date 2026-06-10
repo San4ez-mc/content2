@@ -62,6 +62,8 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
   const [selectedPost, setSelectedPost] = useState<PostGroup | null>(null);
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
   const [activeNetwork, setActiveNetwork] = useState<string | null>(null); // null = all
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
   const sseRef = useRef<EventSource | null>(null);
 
   const [year, month] = monthStr.split("-").map(Number);
@@ -116,6 +118,45 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
     if (!postsByDate.has(d)) postsByDate.set(d, []);
     postsByDate.get(d)!.push(g);
   });
+
+  function toggleBulkSelect(id: string) {
+    setBulkSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Видалити ${bulkSelected.size} постів?`)) return;
+    setBulkLoading(true);
+    try {
+      for (const id of bulkSelected) {
+        await fetch(`/api/posts/${id}`, { method: "DELETE" });
+      }
+      setBulkSelected(new Set());
+      queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  async function bulkStatus(status: string) {
+    setBulkLoading(true);
+    try {
+      for (const id of bulkSelected) {
+        await fetch(`/api/posts/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+      }
+      setBulkSelected(new Set());
+      queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });
+    } finally {
+      setBulkLoading(false);
+    }
+  }
 
   function prevMonth() {
     const d = new Date(year, month - 2);
@@ -187,7 +228,47 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
           })}
         </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {bulkSelected.size > 0 && (
+            <div className="flex items-center gap-1 bg-canvas border border-border rounded-lg px-2 py-1">
+              <span className="text-xs text-fg-muted">{bulkSelected.size} обрано</span>
+              <div className="w-px h-3 bg-border mx-1" />
+              <button
+                onClick={() => bulkStatus("scheduled")}
+                disabled={bulkLoading}
+                className="text-xs text-warn hover:text-warn/80 px-1.5 py-0.5 hover:bg-border/30 rounded transition-colors"
+              >
+                ⏰ Заплановано
+              </button>
+              <button
+                onClick={() => bulkStatus("published")}
+                disabled={bulkLoading}
+                className="text-xs text-success hover:text-success/80 px-1.5 py-0.5 hover:bg-border/30 rounded transition-colors"
+              >
+                ✅ Опубліковано
+              </button>
+              <button
+                onClick={() => bulkStatus("archived")}
+                disabled={bulkLoading}
+                className="text-xs text-fg-muted px-1.5 py-0.5 hover:bg-border/30 rounded transition-colors"
+              >
+                📦 Архів
+              </button>
+              <button
+                onClick={bulkDelete}
+                disabled={bulkLoading}
+                className="text-xs text-danger px-1.5 py-0.5 hover:bg-danger/10 rounded transition-colors"
+              >
+                🗑
+              </button>
+              <button
+                onClick={() => setBulkSelected(new Set())}
+                className="text-xs text-fg-subtle px-1 hover:text-fg"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setQuickCreateDate(format(new Date(), "yyyy-MM-dd"))}
             className="btn-primary text-xs px-3 py-1"
@@ -258,7 +339,9 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
                     <PostChip
                       key={group.id}
                       group={group}
-                      onClick={() => setSelectedPost(group)}
+                      onClick={() => { if (bulkSelected.size > 0) { toggleBulkSelect(group.id); } else { setSelectedPost(group); } }}
+                      bulkSelected={bulkSelected.has(group.id)}
+                      onBulkSelect={() => toggleBulkSelect(group.id)}
                     />
                   ))}
                 </div>
@@ -298,7 +381,9 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
   );
 }
 
-function PostChip({ group, onClick }: { group: PostGroup; onClick: () => void }) {
+function PostChip({ group, onClick, bulkSelected, onBulkSelect }: {
+  group: PostGroup; onClick: () => void; bulkSelected: boolean; onBulkSelect: () => void;
+}) {
   const platformKey = group.socialNetwork.platformKey;
   const color = group.socialNetwork.color || PLATFORM_COLORS[platformKey] || "#64748b";
   const firstItem = group.items[0];
@@ -318,9 +403,21 @@ function PostChip({ group, onClick }: { group: PostGroup; onClick: () => void })
   return (
     <button
       onClick={onClick}
-      className="post-chip w-full text-left group/chip"
+      className={cn("post-chip w-full text-left group/chip", bulkSelected && "ring-1 ring-accent bg-accent/5")}
       style={{ borderLeftColor: color, borderLeftWidth: 2 }}
     >
+      {/* Bulk checkbox */}
+      <div
+        className={cn(
+          "w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all",
+          bulkSelected
+            ? "border-accent bg-accent opacity-100"
+            : "border-border opacity-0 group/chip-hover:opacity-100 hover:opacity-100"
+        )}
+        onClick={(e) => { e.stopPropagation(); onBulkSelect(); }}
+      >
+        {bulkSelected && <span className="text-white text-[8px] font-bold">✓</span>}
+      </div>
       {/* Image thumbnail */}
       {hasImage && (
         <img

@@ -47,6 +47,7 @@ model Project {
   scheduleSettings ScheduleSettings?
   invitations      Invitation[]
   knowledgeEntries KnowledgeEntry[]
+  contentTypes     ContentType[]
 
   @@map("projects")
 }
@@ -307,6 +308,26 @@ model KnowledgeEntry {
 
   @@index([projectId, isActive])
   @@map("knowledge_entries")
+}
+
+// ─── Content Types ──────────────────────────────────────
+
+model ContentType {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  description String?  @db.Text
+  prompt      String   @db.Text
+  tone        String?
+  structure   String?  @db.Text
+  platforms   Json     @default("[]")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("content_types")
 }
 
 // ─── Publication (future) ───────────────────────────────

@@ -1,23 +1,30 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { ContentTypesView } from "@/components/content-types/ContentTypesView";
 
 export const metadata = { title: "Типи контенту" };
 
-export default async function ContentTypesPage() {
+export default async function ContentTypesPage({ searchParams }: { searchParams: { projectId?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  return (
-    <div className="flex flex-col items-center justify-center h-[calc(100vh-40px)] text-center p-8">
-      <div className="text-6xl mb-4">📝</div>
-      <h2 className="text-lg font-semibold text-fg mb-2">Типи контенту</h2>
-      <p className="text-sm text-fg-muted max-w-sm">
-        Шаблони постів з промптами для AI-генерації. Кожен тип — це готова інструкція для бота: яким тоном, структурою та CTA писати.
-      </p>
-      <div className="mt-4 px-3 py-1.5 bg-warn/10 border border-warn/30 rounded-lg">
-        <p className="text-xs text-warn font-medium">⏳ В розробці — Фаза 3</p>
-      </div>
-    </div>
-  );
+  const userId = (session.user as any).id;
+  const role = (session.user as any).role;
+
+  let projectId: string | null = null;
+  if (role === "superadmin") {
+    const p = searchParams.projectId
+      ? await prisma.project.findUnique({ where: { id: searchParams.projectId } })
+      : await prisma.project.findFirst();
+    projectId = p?.id || null;
+  } else {
+    const pu = await prisma.projectUser.findFirst({ where: { userId } });
+    projectId = pu?.projectId || null;
+  }
+
+  if (!projectId) redirect("/");
+
+  return <ContentTypesView projectId={projectId} />;
 }

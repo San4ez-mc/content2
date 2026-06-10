@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 interface UserRecord {
@@ -17,6 +18,16 @@ interface Project {
   name: string;
 }
 
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  usedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+  project: { name: string };
+}
+
 interface Props {
   users: UserRecord[];
   projects: Project[];
@@ -31,7 +42,15 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
 export function AdminView({ users: initial, projects }: Props) {
   const [users, setUsers] = useState(initial);
   const [showAddUser, setShowAddUser] = useState(false);
-  const [activeTab, setActiveTab] = useState<"users" | "projects">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "projects" | "invitations">("users");
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+
+  const { data: invitations = [], refetch: refetchInvitations } = useQuery<Invitation[]>({
+    queryKey: ["invitations"],
+    queryFn: () => fetch("/api/admin/invitations").then((r) => r.json()),
+    enabled: activeTab === "invitations",
+  });
 
   async function refreshUsers() {
     const r = await fetch("/api/admin/users");
@@ -44,7 +63,7 @@ export function AdminView({ users: initial, projects }: Props) {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-canvas-subtle shrink-0">
         <div className="flex items-center gap-1">
-          {(["users", "projects"] as const).map((t) => (
+          {(["users", "projects", "invitations"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -52,15 +71,22 @@ export function AdminView({ users: initial, projects }: Props) {
                 activeTab === t ? "bg-accent text-white" : "text-fg-muted hover:text-fg hover:bg-border/30"
               )}
             >
-              {t === "users" ? "👥 Користувачі" : "📋 Проекти"}
+              {t === "users" ? "👥 Користувачі" : t === "projects" ? "📋 Проекти" : "✉️ Запрошення"}
             </button>
           ))}
         </div>
-        {activeTab === "users" && (
-          <button onClick={() => setShowAddUser(true)} className="ml-auto btn-primary text-xs px-3 py-1">
-            + Користувач
-          </button>
-        )}
+        <div className="ml-auto flex gap-2">
+          {activeTab === "users" && (
+            <button onClick={() => setShowAddUser(true)} className="btn-primary text-xs px-3 py-1">
+              + Користувач
+            </button>
+          )}
+          {activeTab === "invitations" && (
+            <button onClick={() => setShowInvite(true)} className="btn-primary text-xs px-3 py-1">
+              ✉️ Запросити
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 max-w-4xl">
@@ -106,7 +132,7 @@ export function AdminView({ users: initial, projects }: Props) {
               );
             })}
           </div>
-        ) : (
+        ) : activeTab === "projects" ? (
           <div className="space-y-2">
             {projects.map((p) => (
               <div key={p.id} className="flex items-center gap-4 p-4 bg-canvas-subtle border border-border rounded-xl">
@@ -121,6 +147,37 @@ export function AdminView({ users: initial, projects }: Props) {
               </div>
             ))}
           </div>
+        ) : (
+          <div className="space-y-2">
+            {invitations.length === 0 && (
+              <div className="text-center py-8 text-sm text-fg-muted">Немає запрошень</div>
+            )}
+            {invitations.map((inv) => {
+              const used = !!inv.usedAt;
+              const expired = !used && new Date() > new Date(inv.expiresAt);
+              return (
+                <div key={inv.id} className="flex items-center gap-4 p-4 bg-canvas-subtle border border-border rounded-xl">
+                  <div className={cn("w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0",
+                    used ? "bg-success/20 text-success" : expired ? "bg-danger/20 text-danger" : "bg-accent/20 text-accent")}>
+                    {used ? "✓" : expired ? "!" : "✉"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-fg truncate">{inv.email}</p>
+                    <p className="text-xs text-fg-muted">{inv.project.name} · {inv.role}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={cn("text-xs font-medium",
+                      used ? "text-success" : expired ? "text-danger" : "text-accent")}>
+                      {used ? "Використано" : expired ? "Застаріло" : "Активне"}
+                    </p>
+                    <p className="text-[10px] text-fg-subtle">
+                      до {new Date(inv.expiresAt).toLocaleDateString("uk-UA")}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -131,6 +188,102 @@ export function AdminView({ users: initial, projects }: Props) {
           onAdded={() => { refreshUsers(); setShowAddUser(false); }}
         />
       )}
+      {showInvite && (
+        <InviteModal
+          projects={projects}
+          onClose={() => { setShowInvite(false); setInviteUrl(null); }}
+          onCreated={(url) => { setInviteUrl(url); refetchInvitations(); }}
+        />
+      )}
+      {inviteUrl && !showInvite && (
+        <div className="modal-backdrop" onClick={() => setInviteUrl(null)}>
+          <div className="bg-canvas-subtle border border-border rounded-xl shadow-2xl w-full max-w-md p-6 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-4">
+              <div className="text-3xl mb-2">✅</div>
+              <h3 className="text-sm font-semibold text-fg">Запрошення створено!</h3>
+              <p className="text-xs text-fg-muted mt-1">Поділіться цим посиланням з користувачем</p>
+            </div>
+            <div className="flex gap-2">
+              <input className="input flex-1 text-xs" value={inviteUrl} readOnly />
+              <button
+                onClick={() => navigator.clipboard.writeText(inviteUrl)}
+                className="btn-primary text-xs px-3"
+              >
+                📋 Копіювати
+              </button>
+            </div>
+            <button onClick={() => setInviteUrl(null)} className="btn-ghost w-full text-xs py-2 mt-3">Закрити</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InviteModal({ projects, onClose, onCreated }: { projects: Project[]; onClose: () => void; onCreated: (url: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [projectId, setProjectId] = useState(projects[0]?.id || "");
+  const [role, setRole] = useState("editor");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (!email || !projectId) { setError("Заповніть всі поля"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const r = await fetch("/api/admin/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, projectId, projectRole: role }),
+      });
+      const data = await r.json();
+      if (!r.ok) { setError(data.error || "Помилка"); return; }
+      onCreated(data.inviteUrl);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="bg-canvas-subtle border border-border rounded-xl shadow-2xl w-full max-w-md animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-fg">✉️ Запросити користувача</h3>
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg text-lg">×</button>
+        </div>
+        <div className="p-5 space-y-3">
+          {error && <div className="text-xs text-danger bg-danger/10 rounded-lg p-2">{error}</div>}
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1.5">Email</label>
+            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1.5">Проект</label>
+              <select className="input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1.5">Роль</label>
+              <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="viewer">Viewer (читання)</option>
+                <option value="editor">Editor (редагування)</option>
+                <option value="owner">Owner (власник)</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-fg-subtle">Посилання буде дійсним 7 днів</p>
+        </div>
+        <div className="flex gap-2 px-5 pb-5">
+          <button onClick={onClose} className="btn-ghost flex-1 text-xs py-2">Скасувати</button>
+          <button onClick={save} disabled={saving} className="btn-primary flex-1 text-xs py-2">
+            {saving ? "Створення..." : "Надіслати запрошення"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
