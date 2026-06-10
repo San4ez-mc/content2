@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ───────────────────────────────────────────────
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String        @map("password_hash")
+  name          String
+  role          UserRole      @default(client)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  projectUsers  ProjectUser[]
+  chatSessions  ChatSession[]
+  notifications Notification[]
+  invitations   Invitation[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  superadmin
+  admin
+  client
+}
+
+model Project {
+  id               String            @id @default(cuid())
+  name             String
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  projectUsers     ProjectUser[]
+  socialNetworks   SocialNetwork[]
+  categories       Category[]
+  personas         Persona[]
+  postGroups       PostGroup[]
+  chatSessions     ChatSession[]
+  notifications    Notification[]
+  mediaItems       MediaItem[]
+  scheduleSettings ScheduleSettings?
+  invitations      Invitation[]
+
+  @@map("projects")
+}
+
+model ProjectUser {
+  userId    String      @map("user_id")
+  projectId String      @map("project_id")
+  role      ProjectRole @default(viewer)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("project_users")
+}
+
+enum ProjectRole {
+  owner
+  editor
+  viewer
+}
+
+model Invitation {
+  id        String    @id @default(cuid())
+  email     String
+  projectId String    @map("project_id")
+  token     String    @unique
+  role      ProjectRole @default(editor)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdBy String    @map("created_by")
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator   User      @relation(fields: [createdBy], references: [id])
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("invitations")
+}
+
+// ─── Content ────────────────────────────────────────────
+
+model SocialNetwork {
+  id         String      @id @default(cuid())
+  projectId  String      @map("project_id")
+  name       String
+  platformKey String     @map("platform_key") // instagram_posts, threads, linkedin...
+  icon       String?
+  color      String?     // hex
+  isEnabled  Boolean     @default(true) @map("is_enabled")
+  sortOrder  Int         @default(0) @map("sort_order")
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  categories Category[]
+  postGroups PostGroup[]
+
+  @@map("social_networks")
+}
+
+model Category {
+  id              String        @id @default(cuid())
+  projectId       String        @map("project_id")
+  socialNetworkId String        @map("social_network_id")
+  name            String
+  color           String?
+  description     String?
+  clientType      String?       @map("client_type") // TYPE_1, TYPE_2, TYPE_3
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
+  postGroups      PostGroup[]
+
+  @@map("categories")
+}
+
+model Persona {
+  id             String      @id @default(cuid())
+  projectId      String      @map("project_id")
+  name           String
+  age            Int?
+  gender         String?
+  type           String?     // TYPE_1, TYPE_2, TYPE_3
+  pains          String?     @db.Text
+  goals          String?     @db.Text
+  tone           String?
+  forbiddenWords String?     @map("forbidden_words") @db.Text
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  postGroups     PostGroup[]
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  @@map("personas")
+}
+
+model PostGroup {
+  id              String        @id @default(cuid())
+  projectId       String        @map("project_id")
+  socialNetworkId String        @map("social_network_id")
+  categoryId      String?       @map("category_id")
+  personaId       String?       @map("persona_id")
+  postDate        DateTime      @map("post_date") @db.Date
+  type            PostGroupType @default(single)
+  audience        String?       // cold, warm1, warm2, hot1, hot2
+  status          PostStatus    @default(draft)
+  scheduleTime    String?       @map("schedule_time") // "09:00"
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  persona         Persona?      @relation(fields: [personaId], references: [id])
+  items           PostItem[]
+  notifications   Notification[]
+  publicationQueue PublicationQueue?
+
+  @@index([projectId, postDate])
+  @@map("post_groups")
+}
+
+enum PostGroupType {
+  single
+  carousel
+  thread_chain
+  stories
+}
+
+enum PostStatus {
+  draft
+  scheduled
+  published
+  archived
+}
+
+model PostItem {
+  id               String            @id @default(cuid())
+  groupId          String            @map("group_id")
+  orderIndex       Int               @map("order_index") @default(0)
+  content          String?           @db.Text
+  imagePrompt      String?           @map("image_prompt") @db.Text
+  imagePath        String?           @map("image_path")
+  imageType        String?           @map("image_type") // flux, ideogram, recraft...
+  generationStatus GenerationStatus  @default(pending) @map("generation_status")
+  generationError  String?           @map("generation_error") @db.Text
+  isCta            Boolean           @default(false) @map("is_cta")
+  slideTitle       String?           @map("slide_title")
+  slideSubtitle    String?           @map("slide_subtitle")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  group            PostGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, orderIndex])
+  @@map("post_items")
+}
+
+enum GenerationStatus {
+  pending
+  generating
+  done
+  failed
+}
+
+// ─── Media ──────────────────────────────────────────────
+
+model MediaItem {
+  id           String   @id @default(cuid())
+  projectId    String   @map("project_id")
+  fileName     String   @map("file_name")
+  filePath     String   @map("file_path")
+  mimeType     String   @map("mime_type")
+  folder       String?
+  tags         Json?
+  aiGenerated  Boolean  @default(false) @map("ai_generated")
+  createdAt    DateTime @default(now()) @map("created_at")
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("media_items")
+}
+
+// ─── Chat ───────────────────────────────────────────────
+
+model ChatSession {
+  id           String        @id @default(cuid())
+  projectId    String        @map("project_id")
+  userId       String        @map("user_id")
+  sessionKey   String        @unique @map("session_key")
+  lastActivity DateTime      @default(now()) @map("last_activity")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
+  messages     ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String      @map("session_id")
+  role      MessageRole
+  content   String      @db.Text
+  createdAt DateTime    @default(now()) @map("created_at")
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+// ─── Notifications ──────────────────────────────────────
+
+model Notification {
+  id          String    @id @default(cuid())
+  projectId   String    @map("project_id")
+  userId      String    @map("user_id")
+  type        String    // generation_done, generation_failed, scheduled_reminder
+  title       String
+  body        String    @db.Text
+  postGroupId String?   @map("post_group_id")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+  postGroup   PostGroup? @relation(fields: [postGroupId], references: [id])
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// ─── Schedule ───────────────────────────────────────────
+
+model ScheduleSettings {
+  id               String   @id @default(cuid())
+  projectId        String   @unique @map("project_id")
+  monday           Json     @default("[]")
+  tuesday          Json     @default("[]")
+  wednesday        Json     @default("[]")
+  thursday         Json     @default("[]")
+  friday           Json     @default("[]")
+  saturday         Json     @default("[]")
+  sunday           Json     @default("[]")
+  sendToTelegram   Boolean  @default(true) @map("send_to_telegram")
+  telegramChatId   String?  @map("telegram_chat_id")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("schedule_settings")
+}
+
+// ─── Publication (future) ───────────────────────────────
+
+model PublicationQueue {
+  id          String   @id @default(cuid())
+  postGroupId String   @unique @map("post_group_id")
+  platform    String
+  scheduledAt DateTime @map("scheduled_at")
+  status      String   @default("pending") // pending, published, failed
+  externalId  String?  @map("external_id")
+  errorMessage String? @map("error_message") @db.Text
+  postGroup   PostGroup @relation(fields: [postGroupId], references: [id], onDelete: Cascade)
+
+  @@map("publication_queue")
+}
