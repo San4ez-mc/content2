@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     sessionKey: chatSession.sessionKey,
+    projectId: pid,
     messages: chatSession.messages,
   });
 }

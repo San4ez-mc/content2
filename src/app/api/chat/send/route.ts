@@ -31,8 +31,30 @@ export async function POST(req: NextRequest) {
     data: { lastActivity: new Date() },
   });
 
+  // Load recent history (last 20 messages)
+  const history = await prisma.chatMessage.findMany({
+    where: { sessionId: chatSession.id },
+    orderBy: { createdAt: "asc" },
+    take: 20,
+  });
+
+  // Load active knowledge entries for this project
+  const knowledgeEntries = await prisma.knowledgeEntry.findMany({
+    where: { projectId: chatSession.projectId, isActive: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Format knowledge as context block
+  const knowledgeBlock = knowledgeEntries.length > 0
+    ? knowledgeEntries.map((e) => `[${e.category.toUpperCase()}] ${e.title}: ${e.content}`).join("\n")
+    : "";
+
   // Forward to Flows (content-manager-web)
-  const callbackUrl = `${process.env.NEXTAUTH_URL}/api/webhooks/chat-reply?token=${process.env.WEBHOOK_SECRET}&sessionKey=${sessionKey}&projectId=${chatSession.projectId}`;
+  const base = process.env.NEXTAUTH_URL;
+  const wh = process.env.WEBHOOK_SECRET;
+  const callbackUrl = `${base}/api/webhooks/chat-reply?token=${wh}&sessionKey=${sessionKey}&projectId=${chatSession.projectId}`;
+  const importUrl = `${base}/api/posts/bulk-import?token=${wh}`;
+  const saveKnowledgeUrl = `${base}/api/webhooks/save-knowledge`;
 
   try {
     await fetch(FLOWS_WEBHOOK, {
@@ -43,7 +65,12 @@ export async function POST(req: NextRequest) {
         sessionId: sessionKey,
         projectId: chatSession.projectId,
         callbackUrl,
+        importUrl,
+        saveKnowledgeUrl,
+        webhookSecret: wh,
         today: new Date().toISOString().slice(0, 10),
+        history: history.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+        knowledgeBase: knowledgeBlock,
       }),
     });
   } catch (e) {

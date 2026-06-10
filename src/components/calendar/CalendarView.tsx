@@ -61,7 +61,7 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
   const queryClient = useQueryClient();
   const [selectedPost, setSelectedPost] = useState<PostGroup | null>(null);
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
-  const [activeNetworks, setActiveNetworks] = useState<Set<string>>(new Set(socialNetworks.map((n) => n.id)));
+  const [activeNetwork, setActiveNetwork] = useState<string | null>(null); // null = all
   const sseRef = useRef<EventSource | null>(null);
 
   const [year, month] = monthStr.split("-").map(Number);
@@ -155,25 +155,34 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
           </select>
         )}
 
-        {/* Network filters */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Network filters — radio (single select, null = all) */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setActiveNetwork(null)}
+            className={cn(
+              "text-xs px-2.5 py-0.5 rounded-full border transition-colors",
+              activeNetwork === null
+                ? "bg-accent text-white border-accent"
+                : "text-fg-muted border-border hover:border-accent/50"
+            )}
+          >
+            Всі
+          </button>
           {socialNetworks.map((n) => {
             const color = n.color || PLATFORM_COLORS[n.platformKey] || "#64748b";
+            const active = activeNetwork === n.id;
             return (
-              <label key={n.id} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={activeNetworks.has(n.id)}
-                  onChange={(e) => {
-                    const s = new Set(activeNetworks);
-                    if (e.target.checked) s.add(n.id); else s.delete(n.id);
-                    setActiveNetworks(s);
-                  }}
-                  className="w-3 h-3"
-                  style={{ accentColor: color }}
-                />
-                <span className="text-xs text-fg-muted">{n.name}</span>
-              </label>
+              <button
+                key={n.id}
+                onClick={() => setActiveNetwork(active ? null : n.id)}
+                className={cn(
+                  "text-xs px-2.5 py-0.5 rounded-full border transition-colors",
+                  active ? "text-white border-transparent" : "text-fg-muted border-border hover:border-accent/50"
+                )}
+                style={active ? { backgroundColor: color, borderColor: color } : {}}
+              >
+                {n.name}
+              </button>
             );
           })}
         </div>
@@ -208,7 +217,7 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
             const today = isToday(day);
             const curMonth = isSameMonth(day, new Date(year, month - 1));
             const posts = (postsByDate.get(dateStr) || []).filter(
-              (g) => activeNetworks.has(g.socialNetwork.id)
+              (g) => activeNetwork === null || g.socialNetwork.id === activeNetwork
             );
 
             return (

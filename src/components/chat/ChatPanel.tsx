@@ -25,8 +25,11 @@ export function ChatPanel() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const sseRef = useRef<EventSource | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Auto-scroll
   useEffect(() => {
@@ -40,17 +43,29 @@ export function ChatPanel() {
       .then((r) => r.json())
       .then((data) => {
         setSessionKey(data.sessionKey);
+        setProjectId(data.projectId || null);
         setMessages(data.messages || []);
       });
   }, [open, sessionKey]);
 
-  // SSE for incoming replies
+  // Own SSE connection (independent of CalendarView)
+  useEffect(() => {
+    if (!open || !projectId) return;
+    if (sseRef.current) sseRef.current.close();
+    const es = new EventSource(`/api/sse/project/${projectId}`);
+    sseRef.current = es;
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("sse_event", { detail: data }));
+      } catch {}
+    };
+    return () => { es.close(); sseRef.current = null; };
+  }, [open, projectId]);
+
+  // Listen for chat_reply events
   useEffect(() => {
     if (!open || !sessionKey) return;
-
-    // SSE is project-scoped; replies come through broadcastToProject
-    // Chat replies will be caught by the parent SSE hook
-    // For simplicity, we poll via React Query or listen to custom events
     const handler = (e: CustomEvent) => {
       if (e.detail.type === "chat_reply" && e.detail.sessionKey === sessionKey) {
         setMessages((prev) => [
@@ -63,12 +78,32 @@ export function ChatPanel() {
           },
         ]);
         setSending(false);
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       }
     };
-
     window.addEventListener("sse_event" as any, handler);
     return () => window.removeEventListener("sse_event" as any, handler);
   }, [open, sessionKey]);
+
+  // Polling fallback when waiting for reply (every 4s)
+  useEffect(() => {
+    if (!sending || !sessionKey) {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      return;
+    }
+    pollRef.current = setInterval(async () => {
+      const r = await fetch("/api/chat/session", { method: "POST" });
+      const data = await r.json();
+      const msgs: Message[] = data.messages || [];
+      const lastAsst = msgs.filter((m) => m.role === "assistant").pop();
+      if (lastAsst) {
+        setMessages(msgs);
+        setSending(false);
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      }
+    }, 4000);
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+  }, [sending, sessionKey]);
 
   async function send(text: string) {
     if (!text.trim() || sending || !sessionKey) return;
