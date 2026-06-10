@@ -13,15 +13,15 @@ export async function POST(req: NextRequest) {
   const projectId = searchParams.get("projectId");
 
   // Get user's first project if not specified
-  let pid = projectId;
+  let pid: string | null = projectId ?? null;
   if (!pid) {
     const pu = await prisma.projectUser.findFirst({ where: { userId } });
-    pid = pu?.projectId;
+    pid = pu?.projectId ?? null;
     if (!pid) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user?.role === "superadmin") {
         const p = await prisma.project.findFirst();
-        pid = p?.id;
+        pid = p?.id ?? null;
       }
     }
   }
