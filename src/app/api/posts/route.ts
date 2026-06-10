@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { projectId, socialNetworkId, postDate, type, status, content } = body;
+  const { projectId, socialNetworkId, postDate, type, status, content, categoryId, personaId, scheduleTime } = body;
 
   const group = await prisma.postGroup.create({
     data: {
@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
       postDate: new Date(postDate),
       type: type || "single",
       status: status || "draft",
+      ...(categoryId && { categoryId }),
+      ...(personaId && { personaId }),
+      ...(scheduleTime && { scheduleTime }),
       items: {
         create: [{ orderIndex: 0, content: content || "", isCta: false }],
       },

@@ -29,9 +29,12 @@ interface PostGroup {
   type: string;
   status: string;
   audience: string | null;
+  scheduleTime: string | null;
+  categoryId: string | null;
+  personaId: string | null;
   socialNetwork: { id: string; name: string; platformKey: string; color: string | null };
-  category: { name: string; color: string | null } | null;
-  persona: { name: string } | null;
+  category: { id: string; name: string; color: string | null } | null;
+  persona: { id: string; name: string } | null;
   items: PostItem[];
 }
 
@@ -258,6 +261,7 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
       {selectedPost && (
         <PostModal
           group={selectedPost}
+          projectId={activeProject.id}
           onClose={() => setSelectedPost(null)}
           onUpdate={() => {
             queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });

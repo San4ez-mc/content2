@@ -1,21 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+
+interface SocialNetwork {
+  id: string;
+  name: string;
+  platformKey: string;
+  color?: string | null;
+}
 
 interface Props {
   date: string;
   projectId: string;
-  socialNetworks: { id: string; name: string; platformKey: string }[];
+  socialNetworks: SocialNetwork[];
   onClose: () => void;
   onCreated: () => void;
 }
 
 const POST_TYPES = [
-  { value: "single", label: "📝 Single" },
-  { value: "carousel", label: "🎠 Carousel" },
-  { value: "thread_chain", label: "🧵 Thread chain" },
-  { value: "stories", label: "📱 Stories" },
+  { value: "single", label: "📝", title: "Single", desc: "Один пост" },
+  { value: "carousel", label: "🎠", title: "Carousel", desc: "Кілька слайдів" },
+  { value: "thread_chain", label: "🧵", title: "Thread", desc: "Ланцюжок" },
+  { value: "stories", label: "📱", title: "Stories", desc: "Серія stories" },
 ];
 
 export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onCreated }: Props) {
@@ -23,7 +31,29 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
   const [type, setType] = useState("single");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState("draft");
+  const [scheduleTime, setScheduleTime] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Load categories for selected network
+  const { data: categories = [] } = useQuery<any[]>({
+    queryKey: ["categories", projectId],
+    queryFn: () => fetch(`/api/categories?projectId=${projectId}`).then((r) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const networkCategories = categories.filter(
+    (c: any) => c.socialNetworkId === networkId
+  );
+
+  const [categoryId, setCategoryId] = useState("");
+
+  const selectedNetwork = socialNetworks.find((n) => n.id === networkId);
+
+  const displayDate = new Date(date + "T12:00:00").toLocaleDateString("uk-UA", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 
   async function create() {
     setLoading(true);
@@ -38,6 +68,8 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
           type,
           status,
           content,
+          categoryId: categoryId || undefined,
+          scheduleTime: scheduleTime || undefined,
         }),
       });
       onCreated();
@@ -47,6 +79,7 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
   }
 
   async function createWithAI() {
+    if (!content.trim()) return;
     setLoading(true);
     try {
       await fetch("/api/posts/generate-ai", {
@@ -58,6 +91,7 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
           postDate: date,
           type,
           prompt: content,
+          categoryId: categoryId || undefined,
         }),
       });
       onCreated();
@@ -66,102 +100,135 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
     }
   }
 
-  const displayDate = new Date(date).toLocaleDateString("uk-UA", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="bg-canvas-subtle border border-border rounded-xl shadow-2xl w-full max-w-md animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
             <h3 className="text-sm font-semibold text-fg">Новий пост</h3>
             <p className="text-xs text-fg-muted mt-0.5">{displayDate}</p>
           </div>
-          <button onClick={onClose} className="text-fg-subtle hover:text-fg text-lg">×</button>
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg text-xl leading-none">×</button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Network + Type */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-fg-muted mb-1.5">Платформа</label>
-              <select
-                className="input"
-                value={networkId}
-                onChange={(e) => setNetworkId(e.target.value)}
-              >
-                {socialNetworks.map((n) => (
-                  <option key={n.id} value={n.id}>{n.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-fg-muted mb-1.5">Тип</label>
-              <select
-                className="input"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                {POST_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+          {/* Platform selector */}
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-2">Платформа</label>
+            <div className="flex flex-wrap gap-2">
+              {socialNetworks.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => { setNetworkId(n.id); setCategoryId(""); }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
+                    networkId === n.id
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-fg-muted hover:bg-border/20"
+                  )}
+                  style={networkId === n.id ? { borderColor: n.color || undefined, color: n.color || undefined, backgroundColor: (n.color || "#3b82f6") + "15" } : undefined}
+                >
+                  {n.name}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Content / AI prompt */}
+          {/* Post type */}
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-2">Тип</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {POST_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setType(t.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 p-2 rounded-xl border text-xs transition-colors",
+                    type === t.value
+                      ? "border-accent bg-accent/10"
+                      : "border-border text-fg-muted hover:bg-border/20"
+                  )}
+                >
+                  <span className="text-lg">{t.label}</span>
+                  <span className={cn("font-medium text-[10px]", type === t.value ? "text-accent" : "text-fg-muted")}>
+                    {t.title}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content */}
           <div>
             <label className="block text-xs font-medium text-fg-muted mb-1.5">
               Текст або запит до AI
             </label>
             <textarea
-              className="input min-h-24 resize-none text-xs"
+              className="input min-h-20 resize-none text-xs leading-relaxed"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Введіть текст поста або опишіть AI що генерувати..."
+              placeholder={content === "" ? "Введіть текст поста або опишіть AI що генерувати..." : undefined}
               autoFocus
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1.5">Статус</label>
-            <div className="flex gap-2">
-              {["draft", "scheduled"].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatus(s)}
-                  className={cn(
-                    "flex-1 py-1.5 text-xs rounded border transition-colors",
-                    status === s
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border text-fg-muted hover:border-border/80"
-                  )}
-                >
-                  {s === "draft" ? "Чернетка" : "Заплановано"}
-                </button>
-              ))}
+          {/* Category + Status row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1.5">Категорія</label>
+              <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                <option value="">Без категорії</option>
+                {networkCategories.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                {networkCategories.length === 0 && categories.length > 0 && (
+                  <optgroup label="Інші">
+                    {categories.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1.5">Статус</label>
+              <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="draft">Чернетка</option>
+                <option value="scheduled">Заплановано</option>
+              </select>
             </div>
           </div>
+
+          {/* Schedule time (shown when scheduled) */}
+          {status === "scheduled" && (
+            <div>
+              <label className="block text-xs font-medium text-fg-muted mb-1.5">⏰ Час відправки</label>
+              <input
+                type="time"
+                className="input w-32"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
+        {/* Footer */}
         <div className="flex gap-2 px-5 pb-5">
           <button
             onClick={create}
             disabled={loading}
             className="btn-ghost flex-1 justify-center text-xs py-2"
           >
-            Зберегти чернетку
+            💾 Зберегти
           </button>
           <button
             onClick={createWithAI}
-            disabled={loading || !content}
+            disabled={loading || !content.trim()}
             className="btn-primary flex-1 justify-center text-xs py-2"
           >
             ⚡ Генерувати з AI
