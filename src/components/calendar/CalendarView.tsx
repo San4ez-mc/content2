@@ -87,6 +87,8 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
 
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
+      // Broadcast all SSE events to window for other components (ChatPanel etc.)
+      window.dispatchEvent(new CustomEvent("sse_event", { detail: data }));
       if (data.type === "generation_update" || data.type === "post_updated") {
         queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });
       }
