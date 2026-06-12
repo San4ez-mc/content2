@@ -36,6 +36,8 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "delete_posts": return await deletePosts(projectId, params);
       case "regenerate_image": return await regenerateImage(projectId, params);
       case "list_media": return await listMedia(projectId);
+      case "get_rules": return await getRules(projectId, params);
+      case "save_rule": return await saveRule(projectId, params);
       default:
         return NextResponse.json({ ok: false, error: "Unknown action: " + action });
     }
@@ -239,6 +241,28 @@ async function listMedia(projectId: string) {
     count: items.length,
     media: items.map((m) => ({ id: m.id, fileName: m.fileName, url: m.filePath, folder: m.folder, aiGenerated: m.aiGenerated })),
   });
+}
+
+// Assembled project content rules for AI prompts (per-project, editable in /knowledge UI)
+async function getRules(projectId: string, params: Record<string, unknown>) {
+  const category = params.category ? String(params.category) : undefined;
+  const entries = await prisma.knowledgeEntry.findMany({
+    where: { projectId, isActive: true, ...(category ? { category } : {}) },
+    orderBy: [{ category: "asc" }, { createdAt: "asc" }],
+  });
+  const rules = entries.map((e) => `### ${e.title}\n${e.content}`).join("\n\n");
+  return NextResponse.json({ ok: true, count: entries.length, rules });
+}
+
+async function saveRule(projectId: string, params: Record<string, unknown>) {
+  const title = String(params.title || "").trim();
+  const content = String(params.content || "").trim();
+  if (!title || !content) return NextResponse.json({ ok: false, error: "title and content required" });
+  const category = String(params.category || "rule");
+  const entry = await prisma.knowledgeEntry.create({
+    data: { projectId, category, title, content, addedBy: "bot" },
+  });
+  return NextResponse.json({ ok: true, id: entry.id, title: entry.title });
 }
 
 function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any) {
