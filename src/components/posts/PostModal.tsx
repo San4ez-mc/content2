@@ -20,6 +20,7 @@ interface PostItem {
 
 interface PostGroup {
   id: string;
+  number?: number;
   postDate: string;
   type: string;
   status: string;
@@ -180,6 +181,9 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
+              {group.number != null && (
+                <span className="text-xs font-mono text-fg-subtle">#{group.number}</span>
+              )}
               <span className="text-xs font-semibold text-fg">{typeLabel}</span>
               <span className="text-xs text-fg-subtle">·</span>
               <span className="text-xs text-fg-muted" style={{ color: platformColor }}>

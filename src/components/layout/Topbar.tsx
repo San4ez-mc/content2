@@ -13,6 +13,7 @@ const NAV = [
   { href: "/categories", label: "Категорії" },
   { href: "/storage", label: "Сховище" },
   { href: "/content-types", label: "Типи" },
+  { href: "/tools", label: "Воронки" },
   { href: "/networks", label: "Мережі" },
   { href: "/stats", label: "Статистика" },
 ];

@@ -25,6 +25,7 @@ interface PostItem {
 
 interface PostGroup {
   id: string;
+  number?: number;
   postDate: string;
   type: string;
   status: string;
@@ -435,6 +436,9 @@ function PostChip({ group, onClick, bulkSelected, onBulkSelect }: {
           {typeIcon && <span className="text-xs">{typeIcon}</span>}
           {itemCount > 1 && (
             <span className="text-[10px] text-fg-subtle">×{itemCount}</span>
+          )}
+          {group.number != null && (
+            <span className="text-[10px] text-fg-subtle font-mono">#{group.number}</span>
           )}
           <span
             className="text-[10px] font-medium truncate"

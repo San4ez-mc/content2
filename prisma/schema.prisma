@@ -138,6 +138,7 @@ model Persona {
 
 model PostGroup {
   id              String        @id @default(cuid())
+  number          Int           @unique @default(autoincrement())
   projectId       String        @map("project_id")
   socialNetworkId String        @map("social_network_id")
   categoryId      String?       @map("category_id")
@@ -183,6 +184,8 @@ model PostItem {
   imagePrompt      String?           @map("image_prompt") @db.Text
   imagePath        String?           @map("image_path")
   imageType        String?           @map("image_type") // flux, ideogram, recraft...
+  funnelSlug       String?           @map("funnel_slug")
+  funnelParams     Json?             @map("funnel_params")
   generationStatus GenerationStatus  @default(pending) @map("generation_status")
   generationError  String?           @map("generation_error") @db.Text
   isCta            Boolean           @default(false) @map("is_cta")
@@ -343,4 +346,23 @@ model PublicationQueue {
   postGroup   PostGroup @relation(fields: [postGroupId], references: [id], onDelete: Cascade)
 
   @@map("publication_queue")
+}
+
+
+// ─── Content Tools (Global) ───────────────────────────────────
+
+model ContentTool {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  name          String
+  aiDescription String    @map("ai_description") @db.Text
+  exampleOutput String?   @map("example_output") @db.Text
+  paramsSchema  Json      @default("[]") @map("params_schema")
+  isActive      Boolean   @default(true) @map("is_active")
+  sortOrder     Int       @default(0) @map("sort_order")
+  syncedAt      DateTime? @map("synced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("content_tools")
 }

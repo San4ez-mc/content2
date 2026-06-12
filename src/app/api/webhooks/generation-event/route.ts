@@ -5,23 +5,48 @@ import { broadcastToProject } from "@/lib/sse";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 
 export async function POST(req: NextRequest) {
-  const token = req.headers.get("x-webhook-token") || req.nextUrl.searchParams.get("token");
+  const token =
+    req.headers.get("x-webhook-token") ||
+    req.nextUrl.searchParams.get("token");
   if (token !== WEBHOOK_SECRET) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await req.json();
-  const { postItemId, status, imagePath, errorMessage } = body;
+
+  // postItemId can come from URL param (set by bulk-import when firing generation)
+  // or from the body (sent by flows bot directly)
+  const postItemId =
+    req.nextUrl.searchParams.get("postItemId") ||
+    body.postItemId;
+
+  // Normalize imagePath from various generation funnel response formats
+  const imagePath =
+    body.imagePath ||
+    body.imageUrl ||
+    body.image_url ||
+    body.url ||
+    null;
+
+  const errorMessage = body.errorMessage || body.error || null;
+
+  // Auto-derive status if not provided
+  let status: string = body.status;
+  if (!status) {
+    if (imagePath) status = "done";
+    else if (errorMessage) status = "failed";
+    else status = "failed";
+  }
 
   if (!postItemId) {
-    return NextResponse.json({ ok: false, error: "postItemId required" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "postItemId required (body or ?postItemId=)" }, { status: 400 });
   }
 
   // Update post item generation status
   const updated = await prisma.postItem.update({
     where: { id: postItemId },
     data: {
-      generationStatus: status, // 'generating' | 'done' | 'failed'
+      generationStatus: status as any,
       ...(imagePath ? { imagePath } : {}),
       ...(errorMessage ? { generationError: errorMessage } : {}),
     },
@@ -63,12 +88,12 @@ export async function POST(req: NextRequest) {
           body:
             status === "done"
               ? `Зображення для поста від ${dateLabel} (${networkName}) готове`
-              : `Помилка генерації: ${errorMessage || "невідома помилка"}`,
+              : `Помилка генерації для поста від ${dateLabel}: ${errorMessage || "невідома помилка"}`,
           postGroupId: updated.groupId,
         },
       });
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, postItemId, status });
 }
