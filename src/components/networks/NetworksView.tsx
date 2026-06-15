@@ -24,6 +24,8 @@ interface ScheduleSettings {
   sunday: string[];
   sendToTelegram: boolean;
   telegramChatId: string | null;
+  digestTime: string | null;
+  digestChatId: string | null;
 }
 
 interface Props {
@@ -218,6 +220,8 @@ function ScheduleEditor({ projectId, initial }: { projectId: string; initial: Sc
     sunday: [],
     sendToTelegram: true,
     telegramChatId: null,
+    digestTime: null,
+    digestChatId: null,
   };
 
   const [schedule, setSchedule] = useState<ScheduleSettings>(initial || defaultSchedule);
@@ -338,6 +342,40 @@ function ScheduleEditor({ projectId, initial }: { projectId: string; initial: Sc
             </p>
           </div>
         )}
+      </div>
+
+      {/* Morning digest */}
+      <div className="bg-canvas-subtle border border-border rounded-xl p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-fg">🌅 Ранковий дайджест</h3>
+          <p className="text-xs text-fg-muted mt-0.5">
+            Раз на день надсилає всі пости дня code-блоками у Telegram — щоб скопіювати й запостити у соцмережі
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1.5">Час відправки</label>
+            <input
+              type="time"
+              className="input text-xs font-mono"
+              value={schedule.digestTime || ""}
+              onChange={(e) => setSchedule((p) => ({ ...p, digestTime: e.target.value || null }))}
+              placeholder="09:00"
+            />
+            <p className="text-[10px] text-fg-subtle mt-1">Залиште порожнім — дайджест вимкнено</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1.5">Chat ID для дайджесту</label>
+            <input
+              className="input text-xs font-mono"
+              value={schedule.digestChatId || ""}
+              onChange={(e) => setSchedule((p) => ({ ...p, digestChatId: e.target.value || null }))}
+              placeholder="-5298664858"
+            />
+            <p className="text-[10px] text-fg-subtle mt-1">Куди надсилати (може відрізнятись від авто-публікації)</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

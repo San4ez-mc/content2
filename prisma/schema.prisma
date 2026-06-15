@@ -289,6 +289,8 @@ model ScheduleSettings {
   sunday           Json     @default("[]")
   sendToTelegram   Boolean  @default(true) @map("send_to_telegram")
   telegramChatId   String?  @map("telegram_chat_id")
+  digestTime       String?  @map("digest_time")
+  digestChatId     String?  @map("digest_chat_id")
   updatedAt        DateTime @updatedAt @map("updated_at")
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

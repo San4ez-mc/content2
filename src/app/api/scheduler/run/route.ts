@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   // Find all active projects with schedule settings
   const schedules = await prisma.scheduleSettings.findMany({
-    where: { sendToTelegram: true },
+    where: { OR: [{ sendToTelegram: true }, { digestTime: { not: null } }] },
     include: { project: true },
   });
 
@@ -27,9 +27,52 @@ export async function POST(req: NextRequest) {
 
   for (const schedule of schedules) {
     const dayName = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][kyivNow.getDay()];
-    const dayTimes = (schedule as any)[dayName] as string[] || [];
 
-    // Check if current time matches any scheduled time (within 5 min window)
+    // Check morning digest
+    if (schedule.digestTime && schedule.digestChatId) {
+      const [dh, dm] = schedule.digestTime.split(":").map(Number);
+      const digestMin = dh * 60 + dm;
+      const currentMin = kyivNow.getHours() * 60 + kyivNow.getMinutes();
+      if (Math.abs(currentMin - digestMin) <= 5) {
+        const todayPosts = await prisma.postGroup.findMany({
+          where: { projectId: schedule.projectId, postDate: new Date(todayStr) },
+          include: { items: { orderBy: { orderIndex: "asc" } }, socialNetwork: true },
+          orderBy: { scheduleTime: "asc" },
+        });
+
+        if (todayPosts.length > 0) {
+          try {
+            const res = await fetch(TG_FLOWS_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                mode: "digest",
+                projectId: schedule.projectId,
+                telegramChatId: schedule.digestChatId,
+                posts: todayPosts.map((g) => ({
+                  id: g.id,
+                  platform: g.socialNetwork.platformKey,
+                  scheduleTime: g.scheduleTime,
+                  items: g.items.map((i) => ({
+                    content: i.content,
+                    imagePath: i.imagePath,
+                  })),
+                })),
+                today: todayStr,
+              }),
+            });
+            results.push({ projectId: schedule.projectId, mode: "digest", posts: todayPosts.length, ok: res.ok });
+          } catch (e: any) {
+            results.push({ projectId: schedule.projectId, mode: "digest", error: e.message });
+          }
+        }
+      }
+    }
+
+    // Check regular scheduled publishing
+    if (!schedule.sendToTelegram) continue;
+
+    const dayTimes = (schedule as any)[dayName] as string[] || [];
     const shouldRun = dayTimes.some((t: string) => {
       const [h, m] = t.split(":").map(Number);
       const scheduledMin = h * 60 + m;
@@ -60,6 +103,7 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          mode: "publish",
           projectId: schedule.projectId,
           telegramChatId: schedule.telegramChatId,
           posts: posts.map((g) => ({
@@ -77,9 +121,9 @@ export async function POST(req: NextRequest) {
         }),
       });
 
-      results.push({ projectId: schedule.projectId, posts: posts.length, ok: res.ok });
+      results.push({ projectId: schedule.projectId, mode: "publish", posts: posts.length, ok: res.ok });
     } catch (e: any) {
-      results.push({ projectId: schedule.projectId, error: e.message });
+      results.push({ projectId: schedule.projectId, mode: "publish", error: e.message });
     }
   }
 

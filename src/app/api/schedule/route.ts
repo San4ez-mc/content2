@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { projectId, monday, tuesday, wednesday, thursday, friday, saturday, sunday, sendToTelegram, telegramChatId } = body;
+  const { projectId, monday, tuesday, wednesday, thursday, friday, saturday, sunday, sendToTelegram, telegramChatId, digestTime, digestChatId } = body;
 
   const settings = await prisma.scheduleSettings.upsert({
     where: { projectId },
@@ -37,6 +37,8 @@ export async function PUT(req: NextRequest) {
       sunday: sunday || [],
       sendToTelegram: sendToTelegram ?? true,
       telegramChatId,
+      digestTime: digestTime || null,
+      digestChatId: digestChatId || null,
     },
     update: {
       ...(monday !== undefined && { monday }),
@@ -48,6 +50,8 @@ export async function PUT(req: NextRequest) {
       ...(sunday !== undefined && { sunday }),
       ...(sendToTelegram !== undefined && { sendToTelegram }),
       ...(telegramChatId !== undefined && { telegramChatId }),
+      ...(digestTime !== undefined && { digestTime: digestTime || null }),
+      ...(digestChatId !== undefined && { digestChatId: digestChatId || null }),
     },
   });
 
