@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+
+async function saveBase64Image(base64: string, folder: string, ext = "png"): Promise<string> {
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "generated", folder);
+  await mkdir(uploadDir, { recursive: true });
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const buf = Buffer.from(base64, "base64");
+  await writeFile(path.join(uploadDir, fileName), buf);
+  return `/uploads/generated/${folder}/${fileName}`;
+}
 
 export async function POST(req: NextRequest) {
   const token =
@@ -14,19 +25,22 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
 
-  // postItemId can come from URL param (set by bulk-import when firing generation)
-  // or from the body (sent by flows bot directly)
   const postItemId =
     req.nextUrl.searchParams.get("postItemId") ||
     body.postItemId;
 
-  // Normalize imagePath from various generation funnel response formats
-  const imagePath =
+  // Save base64 image to disk if provided instead of URL
+  let imagePath =
     body.imagePath ||
     body.imageUrl ||
     body.image_url ||
     body.url ||
     null;
+
+  if (!imagePath && body.imageBase64) {
+    const folder = postItemId || "misc";
+    imagePath = await saveBase64Image(body.imageBase64, folder);
+  }
 
   const errorMessage = body.errorMessage || body.error || null;
 
