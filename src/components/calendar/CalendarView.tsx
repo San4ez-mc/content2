@@ -62,10 +62,20 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
   const queryClient = useQueryClient();
   const [selectedPost, setSelectedPost] = useState<PostGroup | null>(null);
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
-  const [activeNetwork, setActiveNetwork] = useState<string | null>(null); // null = all
+  const [activeNetwork, setActiveNetwork] = useState<string | null>(null);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const sseRef = useRef<EventSource | null>(null);
+
+  async function handleDropOnDate(postId: string, targetDate: string) {
+    await fetch(`/api/posts/${postId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postDate: targetDate }),
+    });
+    queryClient.invalidateQueries({ queryKey: ["postGroups", activeProject.id, monthStr] });
+  }
 
   const [year, month] = monthStr.split("-").map(Number);
 
@@ -310,8 +320,18 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
                   today
                     ? "border-accent/50 bg-accent/5"
                     : "border-border hover:border-border/80 bg-canvas-subtle",
-                  !curMonth && "opacity-50"
+                  !curMonth && "opacity-50",
+                  dragOverDate === dateStr && "border-accent bg-accent/10 ring-1 ring-accent/40"
                 )}
+                onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateStr); }}
+                onDragLeave={() => setDragOverDate(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverDate(null);
+                  const postId = e.dataTransfer.getData("postId");
+                  const fromDate = e.dataTransfer.getData("fromDate");
+                  if (postId && fromDate !== dateStr) handleDropOnDate(postId, dateStr);
+                }}
               >
                 {/* Day number */}
                 <div className="flex items-center justify-between mb-1.5">
@@ -340,6 +360,7 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
                     <PostChip
                       key={group.id}
                       group={group}
+                      dateStr={dateStr}
                       onClick={() => { if (bulkSelected.size > 0) { toggleBulkSelect(group.id); } else { setSelectedPost(group); } }}
                       bulkSelected={bulkSelected.has(group.id)}
                       onBulkSelect={() => toggleBulkSelect(group.id)}
@@ -382,8 +403,8 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
   );
 }
 
-function PostChip({ group, onClick, bulkSelected, onBulkSelect }: {
-  group: PostGroup; onClick: () => void; bulkSelected: boolean; onBulkSelect: () => void;
+function PostChip({ group, dateStr, onClick, bulkSelected, onBulkSelect }: {
+  group: PostGroup; dateStr: string; onClick: () => void; bulkSelected: boolean; onBulkSelect: () => void;
 }) {
   const platformKey = group.socialNetwork.platformKey;
   const color = group.socialNetwork.color || PLATFORM_COLORS[platformKey] || "#64748b";
@@ -404,7 +425,13 @@ function PostChip({ group, onClick, bulkSelected, onBulkSelect }: {
   return (
     <button
       onClick={onClick}
-      className={cn("post-chip w-full text-left group/chip", bulkSelected && "ring-1 ring-accent bg-accent/5")}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("postId", group.id);
+        e.dataTransfer.setData("fromDate", dateStr);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={cn("post-chip w-full text-left group/chip cursor-grab active:cursor-grabbing", bulkSelected && "ring-1 ring-accent bg-accent/5")}
       style={{ borderLeftColor: color, borderLeftWidth: 2 }}
     >
       {/* Bulk checkbox */}

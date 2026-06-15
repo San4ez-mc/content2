@@ -63,16 +63,19 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [activeItemIdx, setActiveItemIdx] = useState(0);
   const [items, setItems] = useState<PostItem[]>(group.items);
   const [status, setStatus] = useState(group.status);
+  const [postDate, setPostDate] = useState(group.postDate.slice(0, 10));
   const [audience, setAudience] = useState(group.audience || "");
   const [scheduleTime, setScheduleTime] = useState(group.scheduleTime || "");
   const [categoryId, setCategoryId] = useState(group.categoryId || "");
   const [personaId, setPersonaId] = useState(group.personaId || "");
   const [saving, setSaving] = useState(false);
   const [charCounts, setCharCounts] = useState<Record<number, number>>({});
+  const [comment, setComment] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenMsg, setRegenMsg] = useState("");
 
   const pid = projectId || "";
 
-  // Load categories and personas for settings tab
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["categories", pid],
     queryFn: () => fetch(`/api/categories?projectId=${pid}`).then((r) => r.json()),
@@ -89,7 +92,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
 
   const activeItem = items[activeItemIdx];
 
-  // Update char count on content change
   useEffect(() => {
     setCharCounts((prev) => ({
       ...prev,
@@ -109,6 +111,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status,
+          postDate: postDate || undefined,
           audience: audience || null,
           scheduleTime: scheduleTime || null,
           categoryId: categoryId || null,
@@ -129,7 +132,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   }
 
   async function triggerGeneration(itemId: string, imageType: string, prompt: string) {
-    // Save first
     await fetch(`/api/posts/${group.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -157,6 +159,51 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
     const newItems = items.filter((i) => i.id !== itemId);
     setItems(newItems);
     setActiveItemIdx(Math.max(0, activeItemIdx - 1));
+  }
+
+  async function regenerateWithComment() {
+    if (regenerating) return;
+    setRegenerating(true);
+    setRegenMsg("");
+    try {
+      // Get or create chat session
+      let sessionKey: string | null = null;
+      try {
+        const sr = await fetch("/api/chat/session", { method: "POST" });
+        const sd = await sr.json();
+        sessionKey = sd.sessionKey || sd.key || null;
+      } catch {}
+
+      const postContent = items.map((it, i) =>
+        items.length > 1 ? `[${i + 1}] ${it.content || ""}` : it.content || ""
+      ).join("\n\n");
+
+      const text = [
+        `Перегенеруй пост #${group.number ?? group.id.slice(0, 6)} (${group.socialNetwork.name}, ${postDate}):`,
+        "",
+        "--- Поточний текст ---",
+        postContent,
+        "--- Кінець тексту ---",
+        "",
+        comment.trim() ? `Правки від автора:\n${comment.trim()}` : "Перегенеруй з урахуванням кращих практик для цієї мережі.",
+      ].join("\n");
+
+      if (sessionKey) {
+        await fetch("/api/chat/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionKey, text }),
+        });
+        setRegenMsg("✅ Запит надіслано в чат-менеджер. Відповідь з'явиться в чаті.");
+      } else {
+        setRegenMsg("⚠️ Не вдалося підключитися до чат-менеджера. Спробуйте відкрити чат вручну.");
+      }
+      setComment("");
+    } catch (e) {
+      setRegenMsg("❌ Помилка надсилання запиту.");
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   const typeLabel =
@@ -190,9 +237,14 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 {group.socialNetwork.name}
               </span>
               <span className="text-xs text-fg-subtle">·</span>
-              <span className="text-xs text-fg-muted">
-                {new Date(group.postDate).toLocaleDateString("uk-UA", { day: "2-digit", month: "long", year: "numeric" })}
-              </span>
+              {/* Editable date */}
+              <input
+                type="date"
+                value={postDate}
+                onChange={(e) => setPostDate(e.target.value)}
+                className="text-xs text-fg-muted bg-transparent border-b border-dashed border-border hover:border-accent focus:border-accent focus:outline-none cursor-pointer"
+                title="Натисніть щоб змінити дату"
+              />
               {group.category && (
                 <>
                   <span className="text-xs text-fg-subtle">·</span>
@@ -284,7 +336,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
         <div className="flex-1 overflow-y-auto p-5 min-h-0">
           {activeTab === "content" && (
             <div className="space-y-4">
-              {/* Character count bar for platform limits */}
+              {/* Character count bar */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-medium text-fg-muted">
@@ -345,7 +397,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </div>
               )}
 
-              {/* CTA toggle — for multi-item posts */}
+              {/* CTA toggle */}
               {items.length > 1 && (
                 <label className="flex items-center gap-2 cursor-pointer select-none p-3 bg-border/20 rounded-xl border border-border/40">
                   <input
@@ -368,18 +420,39 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </label>
               )}
 
-              {/* Quick tip for threads */}
               {group.type === "thread_chain" && activeItemIdx === items.length - 1 && (
                 <div className="text-xs text-fg-subtle bg-accent/5 border border-accent/20 rounded-xl p-3">
                   💡 Останній пост у Threads — ідеальне місце для посилання на бота або CTA
                 </div>
               )}
+
+              {/* ── Regenerate section ── */}
+              <div className="border border-border/60 rounded-xl p-3 space-y-2 bg-canvas-subtle">
+                <label className="block text-xs font-medium text-fg-muted">
+                  💬 Коментар для перегенерації
+                </label>
+                <textarea
+                  className="input min-h-16 resize-none text-xs"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Що змінити? Напр: «Зроби більш емоційно», «Скорот до 200 символів», «Додай заклик до дії»..."
+                />
+                <button
+                  onClick={regenerateWithComment}
+                  disabled={regenerating}
+                  className="btn-primary text-xs px-4 py-2 w-full justify-center"
+                >
+                  {regenerating ? "⏳ Надсилається..." : "🔄 Перегенерувати пост"}
+                </button>
+                {regenMsg && (
+                  <p className="text-[11px] text-fg-muted">{regenMsg}</p>
+                )}
+              </div>
             </div>
           )}
 
           {activeTab === "media" && (
             <div className="space-y-4">
-              {/* Image preview */}
               {activeItem?.imagePath ? (
                 <div className="relative group/img">
                   <img
@@ -416,7 +489,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </div>
               )}
 
-              {/* Generator */}
               <div>
                 <label className="block text-xs font-medium text-fg-muted mb-1.5">Генератор</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -437,7 +509,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </div>
               </div>
 
-              {/* Prompt */}
               <div>
                 <label className="block text-xs font-medium text-fg-muted mb-1.5">
                   Промпт для зображення
@@ -453,7 +524,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </p>
               </div>
 
-              {/* Generate button */}
               <button
                 onClick={() =>
                   triggerGeneration(
@@ -474,7 +544,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
 
           {activeTab === "settings" && (
             <div className="space-y-4">
-              {/* Audience */}
               <div>
                 <label className="block text-xs font-medium text-fg-muted mb-1.5">🎯 Аудиторія</label>
                 <div className="flex flex-wrap gap-2">
@@ -500,7 +569,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </div>
               </div>
 
-              {/* Schedule time */}
               <div>
                 <label className="block text-xs font-medium text-fg-muted mb-1.5">⏰ Час відправки</label>
                 <input
@@ -514,7 +582,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </p>
               </div>
 
-              {/* Category */}
               {categories.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-fg-muted mb-1.5">📁 Категорія</label>
@@ -531,7 +598,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </div>
               )}
 
-              {/* Persona */}
               {personas.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-fg-muted mb-1.5">👤 Персонаж (аудиторія)</label>

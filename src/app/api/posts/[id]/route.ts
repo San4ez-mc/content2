@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { status, audience, scheduleTime, categoryId, personaId, items } = body;
+  const { status, audience, scheduleTime, categoryId, personaId, postDate, items } = body;
 
   // Update group fields
   const group = await prisma.postGroup.update({
@@ -35,6 +35,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       ...(scheduleTime !== undefined && { scheduleTime }),
       ...(categoryId !== undefined && { categoryId }),
       ...(personaId !== undefined && { personaId }),
+      ...(postDate !== undefined && { postDate: new Date(postDate) }),
     },
     include: { socialNetwork: true },
   });
