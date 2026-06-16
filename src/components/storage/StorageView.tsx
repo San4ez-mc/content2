@@ -27,6 +27,7 @@ export function StorageView({ projectId }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<MediaItem | null>(null);
+  const [lightbox, setLightbox] = useState<MediaItem | null>(null);
   const [newFolder, setNewFolder] = useState("");
   const [showFolderInput, setShowFolderInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +244,25 @@ export function StorageView({ projectId }: Props) {
         </div>
       </div>
 
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white text-3xl leading-none"
+            onClick={() => setLightbox(null)}
+          >×</button>
+          <img
+            src={lightbox.filePath}
+            alt={lightbox.fileName}
+            className="max-w-[95vw] max-h-[95vh] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Preview panel */}
       {preview && (
         <div className="w-64 shrink-0 border-l border-border bg-canvas-subtle flex flex-col">
@@ -252,7 +272,12 @@ export function StorageView({ projectId }: Props) {
           </div>
           <div className="p-3 flex-1 overflow-auto">
             {isImage(preview.mimeType) ? (
-              <img src={preview.filePath} alt={preview.fileName} className="w-full rounded-lg object-contain max-h-48" />
+              <img
+                src={preview.filePath}
+                alt={preview.fileName}
+                className="w-full rounded-lg object-contain max-h-48 cursor-zoom-in"
+                onClick={() => setLightbox(preview)}
+              />
             ) : (
               <div className="w-full aspect-square bg-border/30 rounded-lg flex items-center justify-center text-3xl">
                 {preview.mimeType.startsWith("video/") ? "🎬" : "📄"}
