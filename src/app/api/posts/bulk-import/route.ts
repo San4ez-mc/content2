@@ -116,10 +116,14 @@ export async function POST(req: NextRequest) {
 
   // Notify calendar/UI clients so the page refreshes without reload
   if (insertedPosts.length > 0) {
+    const hasGenerating = insertedPosts.some((p) => p.funnelSlug && p.funnelSlug !== "text_only");
+    const generatingCount = insertedPosts.filter((p) => p.funnelSlug && p.funnelSlug !== "text_only").length;
     broadcastToProject(projectId, {
       type: "post_updated",
       source: "bulk_import",
       count: insertedPosts.length,
+      hasGenerating,
+      generatingCount,
     });
   }
 

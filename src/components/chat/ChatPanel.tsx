@@ -11,13 +11,13 @@ interface Message {
   createdAt: string;
 }
 
-type ImagePhase = null | "text_saved" | "generating" | "done";
+type ImagePhase = null | "generating" | "done";
 
 const QUICK_PROMPTS = [
-  "Згенеруй 3 пости на завтра",
+  "Згенеруй 3 сторіз на завтра",
+  "Зроби 1 пост + 3 сторіз на завтра",
   "Покажи план на цей тиждень",
   "Які пости заплановано сьогодні?",
-  "Створи категорію",
 ];
 
 export function ChatPanel() {
@@ -30,12 +30,14 @@ export function ChatPanel() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [imagePhase, setImagePhase] = useState<ImagePhase>(null);
   const [imageDoneCount, setImageDoneCount] = useState(0);
+  const [imageTotalCount, setImageTotalCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const imageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imagePhaseRef = useRef<ImagePhase>(null);
+  const lastEventRef = useRef<string>("");
 
   useEffect(() => { imagePhaseRef.current = imagePhase; }, [imagePhase]);
 
@@ -54,6 +56,8 @@ export function ChatPanel() {
       });
   }, [open, sessionKey]);
 
+  // SSE connection — only when CalendarView is NOT active (no sse_event listener from it)
+  // We always create our own to be safe on any page; dedup via lastEventRef
   useEffect(() => {
     if (!open || !projectId) return;
     if (sseRef.current) sseRef.current.close();
@@ -62,6 +66,11 @@ export function ChatPanel() {
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
+        // Dedup: CalendarView may also dispatch the same event
+        const key = e.data.slice(0, 200);
+        if (key === lastEventRef.current) return;
+        lastEventRef.current = key;
+        setTimeout(() => { if (lastEventRef.current === key) lastEventRef.current = ""; }, 300);
         window.dispatchEvent(new CustomEvent("sse_event", { detail: data }));
       } catch {}
     };
@@ -73,46 +82,66 @@ export function ChatPanel() {
     setImagePhase("generating");
     if (status === "done" || status === "failed") {
       setImageDoneCount((c) => c + 1);
-      imageTimerRef.current = setTimeout(() => {
+    }
+    // Reset idle timer — transition to "done" 5s after last event
+    imageTimerRef.current = setTimeout(() => {
+      if (imagePhaseRef.current === "generating") {
         setImagePhase("done");
         imageTimerRef.current = setTimeout(() => {
           setImagePhase(null);
           setImageDoneCount(0);
-        }, 4000);
-      }, 4000);
-    }
+          setImageTotalCount(0);
+        }, 5000);
+      }
+    }, 5000);
   }, []);
 
   useEffect(() => {
     if (!open || !sessionKey) return;
-    const handler = (e: CustomEvent) => {
-      if (e.detail.type === "chat_reply" && e.detail.sessionKey === sessionKey) {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.type === "chat_reply" && detail.sessionKey === sessionKey) {
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             role: "assistant",
-            content: e.detail.text,
+            content: detail.text,
             createdAt: new Date().toISOString(),
           },
         ]);
         setSending(false);
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-        setImagePhase("text_saved");
-        setImageDoneCount(0);
-        if (imageTimerRef.current) clearTimeout(imageTimerRef.current);
-        imageTimerRef.current = setTimeout(() => {
-          if (imagePhaseRef.current === "text_saved") setImagePhase(null);
-        }, 15000);
       }
-      if (e.detail.type === "generation_update") {
-        handleGenerationUpdate(e.detail.status);
+      if (detail.type === "post_updated" && detail.source === "bulk_import") {
+        // When posts are saved: if any need image generation, show banner
+        if (detail.hasGenerating && detail.generatingCount > 0) {
+          if (imageTimerRef.current) clearTimeout(imageTimerRef.current);
+          setImagePhase("generating");
+          setImageTotalCount(detail.generatingCount || 0);
+          setImageDoneCount(0);
+          // Auto-clear if no generation_update arrives in 60s
+          imageTimerRef.current = setTimeout(() => {
+            if (imagePhaseRef.current === "generating") {
+              setImagePhase("done");
+              imageTimerRef.current = setTimeout(() => {
+                setImagePhase(null);
+                setImageDoneCount(0);
+                setImageTotalCount(0);
+              }, 4000);
+            }
+          }, 60000);
+        }
+      }
+      if (detail.type === "generation_update") {
+        handleGenerationUpdate(detail.status);
       }
     };
-    window.addEventListener("sse_event" as any, handler);
-    return () => window.removeEventListener("sse_event" as any, handler);
+    window.addEventListener("sse_event", handler);
+    return () => window.removeEventListener("sse_event", handler);
   }, [open, sessionKey, handleGenerationUpdate]);
 
+  // Fallback polling if SSE is not working
   useEffect(() => {
     if (!sending || !sessionKey) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -137,6 +166,7 @@ export function ChatPanel() {
     setSending(true);
     setImagePhase(null);
     setImageDoneCount(0);
+    setImageTotalCount(0);
     setInput("");
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -158,6 +188,12 @@ export function ChatPanel() {
       send(input);
     }
   }
+
+  const bannerLabel = imagePhase === "done"
+    ? `✅ Зображення готові${imageDoneCount > 0 ? ` (${imageDoneCount} шт.)` : ""}!`
+    : imagePhase === "generating"
+    ? `Генерую зображення${imageDoneCount > 0 ? ` (${imageDoneCount}${imageTotalCount > 0 ? `/${imageTotalCount}` : ""} готово)` : ""}...`
+    : null;
 
   return (
     <>
@@ -184,6 +220,7 @@ export function ChatPanel() {
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
+        {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-accent-muted to-accent border-b border-border shrink-0">
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg">🤖</div>
           <div className="flex-1">
@@ -198,6 +235,7 @@ export function ChatPanel() {
           </button>
         </div>
 
+        {/* Image generation status banner */}
         {imagePhase && (
           <div className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-xs border-b shrink-0",
@@ -208,12 +246,11 @@ export function ChatPanel() {
             {imagePhase !== "done" && (
               <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
             )}
-            {imagePhase === "text_saved" && "Тексти і налаштування збережено. Запускаю генерацію зображень..."}
-            {imagePhase === "generating" && `Генерую зображення${imageDoneCount > 0 ? ` (готово: ${imageDoneCount})` : ""}...`}
-            {imagePhase === "done" && `✅ Зображення готові${imageDoneCount > 0 ? ` (${imageDoneCount} шт.)` : ""}!`}
+            <span>{bannerLabel}</span>
           </div>
         )}
 
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-center py-8">
@@ -259,6 +296,7 @@ export function ChatPanel() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Input */}
         <div className="flex gap-2 p-3 border-t border-border bg-canvas shrink-0">
           <textarea
             ref={inputRef}

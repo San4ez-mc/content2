@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -47,6 +47,27 @@ export function StorageView({ projectId }: Props) {
   const [newFolder, setNewFolder] = useState("");
   const [showFolderInput, setShowFolderInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sseRef = useRef<EventSource | null>(null);
+
+  // SSE: auto-refresh storage when images are generated
+  useEffect(() => {
+    if (sseRef.current) sseRef.current.close();
+    const es = new EventSource(`/api/sse/project/${projectId}`);
+    sseRef.current = es;
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        window.dispatchEvent(new CustomEvent("sse_event", { detail: data }));
+        if (data.type === "generation_update" && data.status === "done") {
+          queryClient.invalidateQueries({ queryKey: ["media", projectId] });
+        }
+        if (data.type === "post_updated") {
+          queryClient.invalidateQueries({ queryKey: ["media", projectId] });
+        }
+      } catch {}
+    };
+    return () => { es.close(); sseRef.current = null; };
+  }, [projectId, queryClient]);
 
   const queryKey = ["media", projectId, activeFolder];
 
