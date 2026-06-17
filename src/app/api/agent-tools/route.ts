@@ -131,7 +131,8 @@ async function createPost(projectId: string, params: Record<string, unknown>) {
   if (!network) return NextResponse.json({ ok: false, error: "No networks in project" });
 
   const funnelSlug = (params.funnel_slug as string) || null;
-  const funnelParams = (params.funnel_params as any) || null;
+  let funnelParams: any = (params.funnel_params as any) || null;
+  if (typeof funnelParams === "string") { try { funnelParams = JSON.parse(funnelParams); } catch { funnelParams = null; } }
   const needsGeneration = Boolean(funnelSlug && funnelSlug !== "text_only");
 
   const group = await prisma.postGroup.create({
@@ -218,7 +219,9 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
   }
   let patch: any = params.funnel_params || {};
   if (typeof patch === "string") { try { patch = JSON.parse(patch); } catch { patch = {}; } }
-  const merged = { ...(item.funnelParams as any || {}), ...patch };
+  let storedParams: any = item.funnelParams || {};
+  if (typeof storedParams === "string") { try { storedParams = JSON.parse(storedParams); } catch { storedParams = {}; } }
+  const merged = { ...storedParams, ...patch };
   if (params.image_prompt) merged.imagePrompt = String(params.image_prompt);
 
   await prisma.postItem.update({
