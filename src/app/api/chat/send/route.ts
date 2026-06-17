@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { broadcastToProject } from "@/lib/sse";
 
 const FLOWS_WEBHOOK = "https://flows.fineko.space/webhook/bot/content-manager-web";
 
@@ -29,6 +30,13 @@ export async function POST(req: NextRequest) {
   await prisma.chatSession.update({
     where: { id: chatSession.id },
     data: { lastActivity: new Date() },
+  });
+
+  // Early acknowledgement via SSE only (not saved to DB — ephemeral)
+  broadcastToProject(chatSession.projectId, {
+    type: "chat_reply",
+    sessionKey,
+    text: "⏳ Прийнято в роботу. Генерую відповідь — зачекай...",
   });
 
   // Forward to Flows (content-manager-web)
