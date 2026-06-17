@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
         projectId: chatSession.projectId,
         callbackUrl,
         importUrl,
-        today: new Date().toISOString().slice(0, 10),
+        today: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(2)}`; })(),
+        todayISO: new Date().toISOString().slice(0, 10),
       }),
     });
   } catch (e) {

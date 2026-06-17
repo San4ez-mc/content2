@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,8 @@ interface Message {
   content: string;
   createdAt: string;
 }
+
+type ImagePhase = null | "text_saved" | "generating" | "done";
 
 const QUICK_PROMPTS = [
   "Згенеруй 3 пости на завтра",
@@ -26,17 +28,21 @@ export function ChatPanel() {
   const [sending, setSending] = useState(false);
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [imagePhase, setImagePhase] = useState<ImagePhase>(null);
+  const [imageDoneCount, setImageDoneCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sseRef = useRef<EventSource | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const imageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const imagePhaseRef = useRef<ImagePhase>(null);
 
-  // Auto-scroll
+  useEffect(() => { imagePhaseRef.current = imagePhase; }, [imagePhase]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load/create chat session
   useEffect(() => {
     if (!open || sessionKey) return;
     fetch("/api/chat/session", { method: "POST" })
@@ -48,7 +54,6 @@ export function ChatPanel() {
       });
   }, [open, sessionKey]);
 
-  // Own SSE connection (independent of CalendarView)
   useEffect(() => {
     if (!open || !projectId) return;
     if (sseRef.current) sseRef.current.close();
@@ -63,7 +68,21 @@ export function ChatPanel() {
     return () => { es.close(); sseRef.current = null; };
   }, [open, projectId]);
 
-  // Listen for chat_reply events
+  const handleGenerationUpdate = useCallback((status: string) => {
+    if (imageTimerRef.current) clearTimeout(imageTimerRef.current);
+    setImagePhase("generating");
+    if (status === "done" || status === "failed") {
+      setImageDoneCount((c) => c + 1);
+      imageTimerRef.current = setTimeout(() => {
+        setImagePhase("done");
+        imageTimerRef.current = setTimeout(() => {
+          setImagePhase(null);
+          setImageDoneCount(0);
+        }, 4000);
+      }, 4000);
+    }
+  }, []);
+
   useEffect(() => {
     if (!open || !sessionKey) return;
     const handler = (e: CustomEvent) => {
@@ -79,13 +98,21 @@ export function ChatPanel() {
         ]);
         setSending(false);
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        setImagePhase("text_saved");
+        setImageDoneCount(0);
+        if (imageTimerRef.current) clearTimeout(imageTimerRef.current);
+        imageTimerRef.current = setTimeout(() => {
+          if (imagePhaseRef.current === "text_saved") setImagePhase(null);
+        }, 15000);
+      }
+      if (e.detail.type === "generation_update") {
+        handleGenerationUpdate(e.detail.status);
       }
     };
     window.addEventListener("sse_event" as any, handler);
     return () => window.removeEventListener("sse_event" as any, handler);
-  }, [open, sessionKey]);
+  }, [open, sessionKey, handleGenerationUpdate]);
 
-  // Polling fallback when waiting for reply (every 4s)
   useEffect(() => {
     if (!sending || !sessionKey) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -108,8 +135,9 @@ export function ChatPanel() {
   async function send(text: string) {
     if (!text.trim() || sending || !sessionKey) return;
     setSending(true);
+    setImagePhase(null);
+    setImageDoneCount(0);
     setInput("");
-
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -117,7 +145,6 @@ export function ChatPanel() {
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
-
     await fetch("/api/chat/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -134,7 +161,6 @@ export function ChatPanel() {
 
   return (
     <>
-      {/* FAB */}
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
@@ -148,22 +174,16 @@ export function ChatPanel() {
         {open ? "×" : "🤖"}
       </button>
 
-      {/* Overlay */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setOpen(false)} />
       )}
 
-      {/* Panel */}
       <div
         className={cn(
           "fixed top-0 right-0 bottom-0 z-50 w-96 max-w-full bg-canvas-subtle border-l border-border flex flex-col shadow-2xl transition-transform duration-300",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
-        {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-accent-muted to-accent border-b border-border shrink-0">
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-lg">🤖</div>
           <div className="flex-1">
@@ -178,7 +198,22 @@ export function ChatPanel() {
           </button>
         </div>
 
-        {/* Messages */}
+        {imagePhase && (
+          <div className={cn(
+            "flex items-center gap-2 px-4 py-2.5 text-xs border-b shrink-0",
+            imagePhase === "done"
+              ? "bg-green-500/10 text-green-600 border-green-500/20"
+              : "bg-accent/10 text-accent border-accent/20"
+          )}>
+            {imagePhase !== "done" && (
+              <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" />
+            )}
+            {imagePhase === "text_saved" && "Тексти і налаштування збережено. Запускаю генерацію зображень..."}
+            {imagePhase === "generating" && `Генерую зображення${imageDoneCount > 0 ? ` (готово: ${imageDoneCount})` : ""}...`}
+            {imagePhase === "done" && `✅ Зображення готові${imageDoneCount > 0 ? ` (${imageDoneCount} шт.)` : ""}!`}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-center py-8">
@@ -215,15 +250,15 @@ export function ChatPanel() {
           ))}
 
           {sending && (
-            <div className="bg-border/40 rounded-2xl rounded-bl-sm px-4 py-2.5 text-xs text-fg-muted max-w-[85%]">
-              <span className="animate-pulse">●●●</span>
+            <div className="bg-border/40 rounded-2xl rounded-bl-sm px-4 py-2.5 text-xs text-fg-muted max-w-[85%] flex items-center gap-2">
+              <span className="inline-block w-3 h-3 border-2 border-fg-muted border-t-transparent rounded-full animate-spin shrink-0" />
+              <span>Генерую відповідь...</span>
             </div>
           )}
 
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
         <div className="flex gap-2 p-3 border-t border-border bg-canvas shrink-0">
           <textarea
             ref={inputRef}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface UserRecord {
   id: string;
@@ -126,7 +126,7 @@ export function AdminView({ users: initial, projects }: Props) {
                   </div>
 
                   <span className="text-xs text-fg-subtle shrink-0">
-                    {new Date(u.createdAt).toLocaleDateString("uk-UA")}
+                    {formatDate(u.createdAt)}
                   </span>
                 </div>
               );
@@ -171,7 +171,7 @@ export function AdminView({ users: initial, projects }: Props) {
                       {used ? "Використано" : expired ? "Застаріло" : "Активне"}
                     </p>
                     <p className="text-[10px] text-fg-subtle">
-                      до {new Date(inv.expiresAt).toLocaleDateString("uk-UA")}
+                      до {formatDate(inv.expiresAt)}
                     </p>
                   </div>
                 </div>

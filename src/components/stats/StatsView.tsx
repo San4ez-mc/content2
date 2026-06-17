@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface Stats {
   totals: { total: number; draft: number; scheduled: number; published: number; archived: number };
@@ -30,9 +30,9 @@ export function StatsView({ projectId }: { projectId: string }) {
     );
   }
 
-  if (!stats) return null;
+  if (!stats || !stats.totals) return null;
 
-  const { totals, thisMonth, growthPct, byNetwork, perDay, mediaStats } = stats;
+  const { totals, thisMonth, growthPct, byNetwork = [], perDay = [], mediaStats } = stats;
 
   // Max value for chart bars
   const maxPerDay = Math.max(...perDay.map((d) => d.total), 1);
@@ -108,7 +108,7 @@ export function StatsView({ projectId }: { projectId: string }) {
             <div className="flex items-end gap-1 h-24">
               {perDay.map((d) => {
                 const height = (d.total / maxPerDay) * 100;
-                const date = new Date(d.date).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" });
+                const date = formatDate(d.date);
                 return (
                   <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group" title={`${date}: ${d.total} постів`}>
                     <div className="w-full flex flex-col justify-end" style={{ height: "80px" }}>
@@ -123,10 +123,10 @@ export function StatsView({ projectId }: { projectId: string }) {
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-[10px] text-fg-subtle">
-                {new Date(perDay[0]?.date).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" })}
+                {formatDate(perDay[0]?.date)}
               </span>
               <span className="text-[10px] text-fg-subtle">
-                {new Date(perDay[perDay.length - 1]?.date).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" })}
+                {formatDate(perDay[perDay.length - 1]?.date)}
               </span>
             </div>
           </div>

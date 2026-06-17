@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface SocialNetwork {
   id: string;
@@ -49,11 +49,7 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
 
   const selectedNetwork = socialNetworks.find((n) => n.id === networkId);
 
-  const displayDate = new Date(date + "T12:00:00").toLocaleDateString("uk-UA", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const displayDate = formatDate(new Date(date + "T12:00:00"));
 
   async function create() {
     setLoading(true);

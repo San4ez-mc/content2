@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface MediaItem {
   id: string;
@@ -17,6 +17,22 @@ interface MediaItem {
 
 interface Props {
   projectId: string;
+}
+
+function dateKey(iso: string) {
+  return iso.slice(0, 10);
+}
+
+function groupByDate(items: MediaItem[]): { date: string; label: string; items: MediaItem[] }[] {
+  const map = new Map<string, MediaItem[]>();
+  for (const item of items) {
+    const key = dateKey(item.createdAt);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(item);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, items]) => ({ date, label: formatDate(items[0].createdAt), items }));
 }
 
 export function StorageView({ projectId }: Props) {
@@ -47,6 +63,7 @@ export function StorageView({ projectId }: Props) {
 
   const items = data?.items || [];
   const folders = data?.folders || [];
+  const dateGroups = groupByDate(items);
 
   async function upload(files: FileList) {
     setUploading(true);
@@ -91,9 +108,42 @@ export function StorageView({ projectId }: Props) {
     });
   }
 
+  function selectAll() {
+    setSelected(new Set(items.map((i) => i.id)));
+  }
+
+  function deselectAll() {
+    setSelected(new Set());
+  }
+
+  function toggleDateGroup(dateItems: MediaItem[]) {
+    const ids = dateItems.map((i) => i.id);
+    const allSelected = ids.every((id) => selected.has(id));
+    setSelected((s) => {
+      const n = new Set(s);
+      if (allSelected) {
+        ids.forEach((id) => n.delete(id));
+      } else {
+        ids.forEach((id) => n.add(id));
+      }
+      return n;
+    });
+  }
+
+  function isDateGroupSelected(dateItems: MediaItem[]) {
+    return dateItems.length > 0 && dateItems.every((i) => selected.has(i.id));
+  }
+
+  function isDateGroupIndeterminate(dateItems: MediaItem[]) {
+    const cnt = dateItems.filter((i) => selected.has(i.id)).length;
+    return cnt > 0 && cnt < dateItems.length;
+  }
+
   function isImage(mime: string) { return mime.startsWith("image/"); }
 
   const folderList = Array.from(new Set([...folders.filter(Boolean)])) as string[];
+  const allSelected = items.length > 0 && items.every((i) => selected.has(i.id));
+  const someSelected = !allSelected && items.some((i) => selected.has(i.id));
 
   return (
     <div className="flex h-[calc(100vh-40px)]">
@@ -149,6 +199,18 @@ export function StorageView({ projectId }: Props) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-canvas-subtle shrink-0 flex-wrap">
+          {/* Select all checkbox */}
+          <label className="flex items-center gap-1.5 cursor-pointer" title="Вибрати всі">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => { if (el) el.indeterminate = someSelected; }}
+              onChange={() => allSelected ? deselectAll() : selectAll()}
+              className="w-3.5 h-3.5 accent-accent"
+            />
+            <span className="text-xs text-fg-muted">Всі</span>
+          </label>
+
           <span className="text-xs text-fg-muted">{items.length} файлів</span>
 
           {selected.size > 0 && (
@@ -158,7 +220,6 @@ export function StorageView({ projectId }: Props) {
           )}
 
           <div className="ml-auto flex items-center gap-2">
-            {/* View toggle */}
             <div className="flex border border-border rounded-lg overflow-hidden">
               <button
                 onClick={() => setView("grid")}
@@ -213,32 +274,59 @@ export function StorageView({ projectId }: Props) {
               <p className="text-sm font-medium text-fg-muted">Немає файлів</p>
               <p className="text-xs text-fg-subtle mt-1">Перетягніть файли сюди або натисніть «Завантажити»</p>
             </div>
-          ) : view === "grid" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {items.map((item) => (
-                <GridItem
-                  key={item.id}
-                  item={item}
-                  selected={selected.has(item.id)}
-                  onSelect={() => toggleSelect(item.id)}
-                  onClick={() => setPreview(item)}
-                  isImage={isImage(item.mimeType)}
-                />
-              ))}
-            </div>
           ) : (
-            <div className="space-y-1">
-              {items.map((item) => (
-                <ListItem
-                  key={item.id}
-                  item={item}
-                  selected={selected.has(item.id)}
-                  onSelect={() => toggleSelect(item.id)}
-                  onClick={() => setPreview(item)}
-                  onDelete={() => deleteItem(item.id)}
-                  isImage={isImage(item.mimeType)}
-                />
-              ))}
+            <div className="space-y-6">
+              {dateGroups.map((group) => {
+                const groupSelected = isDateGroupSelected(group.items);
+                const groupIndeterminate = isDateGroupIndeterminate(group.items);
+                return (
+                  <div key={group.date}>
+                    {/* Date header */}
+                    <div className="flex items-center gap-2 mb-3 pb-1.5 border-b border-border">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={groupSelected}
+                          ref={(el) => { if (el) el.indeterminate = groupIndeterminate; }}
+                          onChange={() => toggleDateGroup(group.items)}
+                          className="w-3.5 h-3.5 accent-accent"
+                        />
+                      </label>
+                      <span className="text-xs font-semibold text-fg-muted">{group.label}</span>
+                      <span className="text-[10px] text-fg-subtle">({group.items.length})</span>
+                    </div>
+
+                    {view === "grid" ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {group.items.map((item) => (
+                          <GridItem
+                            key={item.id}
+                            item={item}
+                            selected={selected.has(item.id)}
+                            onSelect={() => toggleSelect(item.id)}
+                            onClick={() => setPreview(item)}
+                            isImage={isImage(item.mimeType)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {group.items.map((item) => (
+                          <ListItem
+                            key={item.id}
+                            item={item}
+                            selected={selected.has(item.id)}
+                            onSelect={() => toggleSelect(item.id)}
+                            onClick={() => setPreview(item)}
+                            onDelete={() => deleteItem(item.id)}
+                            isImage={isImage(item.mimeType)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -296,7 +384,7 @@ export function StorageView({ projectId }: Props) {
               )}
               <div>
                 <p className="text-[10px] text-fg-subtle uppercase tracking-wide">Дата</p>
-                <p className="text-xs text-fg">{new Date(preview.createdAt).toLocaleDateString("uk-UA")}</p>
+                <p className="text-xs text-fg">{formatDate(preview.createdAt)}</p>
               </div>
               {preview.aiGenerated && (
                 <span className="text-[10px] px-1.5 py-0.5 bg-accent/20 text-accent rounded">AI-згенеровано</span>
@@ -342,7 +430,6 @@ function GridItem({ item, selected, onSelect, onClick, isImage }: {
           {item.mimeType.startsWith("video/") ? "🎬" : "📄"}
         </div>
       )}
-      {/* Checkbox overlay */}
       <div
         className={cn("absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-opacity bg-white",
           selected ? "opacity-100 border-accent" : "opacity-0 group-hover:opacity-100 border-border")}
@@ -350,7 +437,6 @@ function GridItem({ item, selected, onSelect, onClick, isImage }: {
       >
         {selected && <span className="text-accent text-xs">✓</span>}
       </div>
-      {/* Filename */}
       <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <p className="text-[10px] text-white truncate">{item.fileName}</p>
       </div>
@@ -385,7 +471,7 @@ function ListItem({ item, selected, onSelect, onClick, onDelete, isImage }: {
         <p className="text-xs font-medium text-fg truncate">{item.fileName}</p>
         <p className="text-[10px] text-fg-subtle">{item.folder || "—"} · {item.mimeType.split("/")[1]}</p>
       </div>
-      <span className="text-[10px] text-fg-subtle shrink-0">{new Date(item.createdAt).toLocaleDateString("uk-UA")}</span>
+      <span className="text-[10px] text-fg-subtle shrink-0">{formatDate(item.createdAt)}</span>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         className="opacity-0 group-hover:opacity-100 text-danger hover:bg-danger/10 rounded p-1 transition-all"
