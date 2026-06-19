@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       imageType: p.media_type || funnelSlug || null,
       funnelSlug: derivedFunnelSlug,
       funnelParams: funnelParams as any,
-      generationStatus: needsGeneration ? "pending" : "done",
+      generationStatus: (needsGeneration ? "pending" : "done") as "pending" | "done",
     };
 
     // Try to claim a placeholder created at generation start (same slot).
