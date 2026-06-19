@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Save user message
-  await prisma.chatMessage.create({
+  const userMsg = await prisma.chatMessage.create({
     data: { sessionId: chatSession.id, role: "user", content: text },
   });
 
@@ -38,6 +38,18 @@ export async function POST(req: NextRequest) {
     sessionKey,
     text: "⏳ Прийнято в роботу. Генерую відповідь — зачекай...",
   });
+
+  // Load recent conversation history (excluding the message we just saved) so the
+  // funnel agent can carry multi-turn context — e.g. "propose theme -> user picks".
+  const recent = await prisma.chatMessage.findMany({
+    where: { sessionId: chatSession.id, id: { not: userMsg.id } },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: { role: true, content: true },
+  });
+  const history = recent
+    .reverse()
+    .map((m) => ({ role: m.role, content: m.content }));
 
   // Forward to Flows (content-manager-web)
   const base = process.env.NEXTAUTH_URL;
@@ -57,6 +69,7 @@ export async function POST(req: NextRequest) {
         importUrl,
         today: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(2)}`; })(),
         todayISO: new Date().toISOString().slice(0, 10),
+        history,
       }),
     });
   } catch (e) {
