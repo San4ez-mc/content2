@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { projectId, posts } = body;
+  const { projectId, posts, deliverTo } = body;
 
   if (!projectId || !Array.isArray(posts) || posts.length === 0) {
     return NextResponse.json({ error: "projectId and posts required" }, { status: 400 });
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   const AUDIENCE_VALID = new Set(["cold", "warm1", "warm2", "hot1", "hot2"]);
 
-  type InsertedPost = { groupId: string; itemId: string; number: number; funnelSlug: string | null; funnelParams: Record<string, unknown> | null };
+  type InsertedPost = { groupId: string; itemId: string; number: number; funnelSlug: string | null; funnelParams: Record<string, unknown> | null; content: string };
   const insertedPosts: InsertedPost[] = [];
   // Placeholder rows created at generation start (status generating_text) get
   // claimed and filled here instead of creating duplicate posts.
@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
       number,
       funnelSlug: derivedFunnelSlug,
       funnelParams: funnelParams || buildParamsFromLegacy(p),
+      content: p.content || "",
     });
   }
 
@@ -168,6 +169,11 @@ export async function POST(req: NextRequest) {
       callbackUrl,
       postItemId: ins.itemId,
       postGroupId: ins.groupId,
+      // When the request came from a Telegram bot, deliver the finished image
+      // straight back to that chat (webhook.js deliverResultToTelegram).
+      ...(deliverTo?.botToken && deliverTo?.chatId
+        ? { deliverTo: { botToken: deliverTo.botToken, chatId: deliverTo.chatId, caption: (ins.content || "").slice(0, 200) } }
+        : {}),
     };
 
     // Mark as generating
