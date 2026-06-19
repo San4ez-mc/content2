@@ -201,6 +201,7 @@ model PostItem {
 
 enum GenerationStatus {
   pending
+  generating_text
   generating
   done
   failed
