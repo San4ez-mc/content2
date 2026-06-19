@@ -25,16 +25,18 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
   const action = String(params.action || "");
   const projectId = String(params.projectId || "");
   if (!projectId) return NextResponse.json({ ok: false, error: "projectId required" });
+  const telegramChatId = String(params.telegramChatId || "");
+  const telegramBotToken = String(params.telegramBotToken || "");
 
   try {
     switch (action) {
       case "list_posts": return await listPosts(projectId, params);
       case "get_post": return await getPost(projectId, params);
-      case "create_post": return await createPost(projectId, params);
+      case "create_post": return await createPost(projectId, params, telegramChatId, telegramBotToken);
       case "edit_post": return await editPost(projectId, params);
       case "delete_post": return await deletePost(projectId, params);
       case "delete_posts": return await deletePosts(projectId, params);
-      case "regenerate_image": return await regenerateImage(projectId, params);
+      case "regenerate_image": return await regenerateImage(projectId, params, telegramChatId, telegramBotToken);
       case "list_media": return await listMedia(projectId);
       case "get_rules": return await getRules(projectId, params);
       case "save_rule": return await saveRule(projectId, params);
@@ -124,7 +126,7 @@ async function getPost(projectId: string, params: Record<string, unknown>) {
   return NextResponse.json({ ok: true, post: serialize(g, true) });
 }
 
-async function createPost(projectId: string, params: Record<string, unknown>) {
+async function createPost(projectId: string, params: Record<string, unknown>, telegramChatId = "", telegramBotToken = "") {
   const platformKey = PLATFORM_MAP[String(params.platform)] || String(params.platform || "instagram_posts");
   const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
   const network = networks.find((n) => n.platformKey === platformKey) || networks.find((n) => n.isEnabled) || networks[0];
@@ -157,7 +159,7 @@ async function createPost(projectId: string, params: Record<string, unknown>) {
     include: { socialNetwork: true, items: true },
   });
 
-  if (needsGeneration) fireGeneration(group.items[0].id, group.id, funnelSlug!, funnelParams);
+  if (needsGeneration) fireGeneration(group.items[0].id, group.id, funnelSlug!, funnelParams, telegramChatId, telegramBotToken);
   broadcastToProject(projectId, { type: "post_updated", source: "agent" });
   return NextResponse.json({ ok: true, post: serialize(group) });
 }
@@ -208,7 +210,7 @@ async function deletePosts(projectId: string, params: Record<string, unknown>) {
 }
 
 // Re-fire image generation, optionally with funnel_params patch (e.g. new palette) or new funnel_slug
-async function regenerateImage(projectId: string, params: Record<string, unknown>) {
+async function regenerateImage(projectId: string, params: Record<string, unknown>, telegramChatId = "", telegramBotToken = "") {
   const g = await findByNumberOrId(projectId, params);
   if (!g || !g.items[0]) return NextResponse.json({ ok: false, error: "Post not found" });
   const item = g.items[0];
@@ -228,7 +230,7 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
     where: { id: item.id },
     data: { funnelSlug, funnelParams: merged, generationStatus: "generating", generationError: null },
   });
-  fireGeneration(item.id, g.id, funnelSlug, merged);
+  fireGeneration(item.id, g.id, funnelSlug, merged, telegramChatId, telegramBotToken);
   broadcastToProject(projectId, { type: "generation_update", postItemId: item.id, postGroupId: g.id, status: "generating" });
   return NextResponse.json({ ok: true, number: g.number, funnel_slug: funnelSlug, funnel_params: merged });
 }
@@ -268,8 +270,12 @@ async function saveRule(projectId: string, params: Record<string, unknown>) {
   return NextResponse.json({ ok: true, id: entry.id, title: entry.title });
 }
 
-function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any) {
-  const callbackUrl = `${CONTENT2_URL}/api/webhooks/generation-event?token=${WEBHOOK_SECRET}&postItemId=${itemId}`;
+function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any, telegramChatId = "", telegramBotToken = "") {
+  const CONTENT2 = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+  const WH_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+  let callbackUrl = CONTENT2 + "/api/webhooks/generation-event?token=" + WH_SECRET + "&postItemId=" + itemId;
+  if (telegramChatId) callbackUrl += "&telegramChatId=" + encodeURIComponent(telegramChatId);
+  if (telegramBotToken) callbackUrl += "&telegramBotToken=" + encodeURIComponent(telegramBotToken);
   fetch(`${FLOWS_BASE}/${funnelSlug}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

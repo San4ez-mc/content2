@@ -188,5 +188,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // ── Deliver image to Telegram if chat context provided ───────────────────
+  const tgChatId = req.nextUrl.searchParams.get("telegramChatId") || body.telegramChatId || null;
+  const tgBotToken = req.nextUrl.searchParams.get("telegramBotToken") || body.telegramBotToken || null;
+  if (status === "done" && imagePath && tgChatId && tgBotToken) {
+    try {
+      const imageFullUrl = imagePath.startsWith("http")
+        ? imagePath
+        : (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + imagePath;
+      await fetch("https://api.telegram.org/bot" + tgBotToken + "/sendPhoto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: tgChatId, photo: imageFullUrl }),
+      });
+    } catch (tgErr: any) {
+      console.error("[generation-event] Telegram delivery failed:", tgErr.message);
+    }
+  }
+
   return NextResponse.json({ ok: true, postItemId, status, imagePath });
 }

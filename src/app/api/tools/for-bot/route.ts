@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 // Public endpoint for content-manager bot — no auth required
 export async function GET() {
   const tools = await prisma.contentTool.findMany({
