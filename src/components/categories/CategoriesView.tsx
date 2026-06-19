@@ -51,6 +51,28 @@ export function CategoriesView({ projectId, categories: initial, networks, perso
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"categories" | "personas">("categories");
+  const [migrating, setMigrating] = useState(false);
+
+  async function migrateFromOld() {
+    if (!confirm("Мігрувати всі категорії з content.fineko.space? Дублікати будуть пропущені.")) return;
+    setMigrating(true);
+    try {
+      const r = await fetch("/api/admin/migrate-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await r.json();
+      if (data.ok) {
+        alert(`Готово! Створено: ${data.created}, пропущено: ${data.skipped}`);
+        qc.invalidateQueries({ queryKey: ["categories", projectId] });
+      } else {
+        alert("Помилка: " + (data.error || "невідома"));
+      }
+    } finally {
+      setMigrating(false);
+    }
+  }
 
   // Categories
   const { data: categories = initial } = useQuery<Category[]>({
@@ -131,7 +153,17 @@ export function CategoriesView({ projectId, categories: initial, networks, perso
           </>
         )}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {activeTab === "categories" && (
+            <button
+              onClick={migrateFromOld}
+              disabled={migrating}
+              className="btn-ghost text-xs px-3 py-1 border border-border"
+              title="Мігрувати категорії зі старої системи"
+            >
+              {migrating ? "⏳ Мігрую..." : "⬇️ Зі старої системи"}
+            </button>
+          )}
           <button
             onClick={() => { setShowForm(true); setEditId(null); }}
             className="btn-primary text-xs px-3 py-1"
