@@ -412,6 +412,7 @@ function PostChip({ group, dateStr, onClick, bulkSelected, onBulkSelect }: {
   const text = firstItem?.content || "";
   const hasImage = firstItem?.imagePath;
   const isGenerating = group.items.some((i) => i.generationStatus === "generating");
+  const isGeneratingText = group.items.some((i) => i.generationStatus === "generating_text");
   const hasFailed = group.items.some((i) => i.generationStatus === "failed");
 
   const typeIcon =
@@ -454,7 +455,7 @@ function PostChip({ group, dateStr, onClick, bulkSelected, onBulkSelect }: {
           className="w-8 h-8 rounded object-cover shrink-0"
         />
       )}
-      {isGenerating && !hasImage && (
+      {(isGenerating || isGeneratingText) && !hasImage && (
         <div className="w-8 h-8 rounded skeleton shrink-0" />
       )}
 
@@ -476,12 +477,15 @@ function PostChip({ group, dateStr, onClick, bulkSelected, onBulkSelect }: {
           {isGenerating && (
             <span className="text-[10px] text-accent animate-pulse">⏳</span>
           )}
+          {isGeneratingText && (
+            <span className="text-[10px] text-accent animate-pulse">✍️</span>
+          )}
           {hasFailed && (
             <span className="text-[10px] text-danger">❌</span>
           )}
         </div>
         <p className="text-[11px] text-fg-muted leading-tight line-clamp-2">
-          {text || "(без тексту)"}
+          {text || (isGeneratingText ? "✍️ генерується текст…" : "(без тексту)")}
         </p>
       </div>
 

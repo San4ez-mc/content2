@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
 
   type InsertedPost = { groupId: string; itemId: string; number: number; funnelSlug: string | null; funnelParams: Record<string, unknown> | null };
   const insertedPosts: InsertedPost[] = [];
+  // Placeholder rows created at generation start (status generating_text) get
+  // claimed and filled here instead of creating duplicate posts.
+  const claimedIds = new Set<string>();
 
   for (const p of posts) {
     const platformKey = PLATFORM_MAP[p.platform] || p.platform || "instagram_posts";
@@ -79,36 +82,63 @@ export async function POST(req: NextRequest) {
     // Determine if image generation is needed
     const needsGeneration = Boolean(derivedFunnelSlug && derivedFunnelSlug !== "text_only");
 
-    const group = await prisma.postGroup.create({
-      data: {
-        projectId,
-        socialNetworkId: network.id,
-        postDate,
-        type: postType as any,
-        audience,
-        status: "scheduled",
-        items: {
-          create: [
-            {
-              orderIndex: 0,
-              content: p.content || "",
-              imagePrompt: p.image_prompt || (funnelParams as any)?.imagePrompt || (funnelParams as any)?.prompt || null,
-              imageType: p.media_type || funnelSlug || null,
-              funnelSlug: derivedFunnelSlug,
-              funnelParams: funnelParams as any,
-              generationStatus: needsGeneration ? "pending" : "done",
-            },
-          ],
-        },
+    const itemData = {
+      content: p.content || "",
+      imagePrompt: p.image_prompt || (funnelParams as any)?.imagePrompt || (funnelParams as any)?.prompt || null,
+      imageType: p.media_type || funnelSlug || null,
+      funnelSlug: derivedFunnelSlug,
+      funnelParams: funnelParams as any,
+      generationStatus: needsGeneration ? "pending" : "done",
+    };
+
+    // Try to claim a placeholder created at generation start (same slot).
+    const placeholder = await prisma.postItem.findFirst({
+      where: {
+        generationStatus: "generating_text",
+        content: "",
+        id: { notIn: Array.from(claimedIds) },
+        group: { is: { projectId, postDate, socialNetworkId: network.id, type: postType as any } },
       },
-      include: { items: true },
+      orderBy: { createdAt: "asc" },
+      include: { group: true },
     });
 
-    const item = group.items[0];
+    let groupId: string;
+    let itemId: string;
+    let number: number;
+
+    if (placeholder) {
+      claimedIds.add(placeholder.id);
+      const updatedItem = await prisma.postItem.update({
+        where: { id: placeholder.id },
+        data: itemData,
+      });
+      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience } });
+      groupId = placeholder.groupId;
+      itemId = updatedItem.id;
+      number = (placeholder.group as any).number;
+    } else {
+      const group = await prisma.postGroup.create({
+        data: {
+          projectId,
+          socialNetworkId: network.id,
+          postDate,
+          type: postType as any,
+          audience,
+          status: "scheduled",
+          items: { create: [{ orderIndex: 0, ...itemData }] },
+        },
+        include: { items: true },
+      });
+      groupId = group.id;
+      itemId = group.items[0].id;
+      number = (group as any).number;
+    }
+
     insertedPosts.push({
-      groupId: group.id,
-      itemId: item.id,
-      number: (group as any).number,
+      groupId,
+      itemId,
+      number,
       funnelSlug: derivedFunnelSlug,
       funnelParams: funnelParams || buildParamsFromLegacy(p),
     });
