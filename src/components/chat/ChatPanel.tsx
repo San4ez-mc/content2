@@ -9,6 +9,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  imageUrl?: string;
 }
 
 type ImagePhase = null | "generating" | "done";
@@ -135,6 +136,22 @@ export function ChatPanel() {
       }
       if (detail.type === "generation_update") {
         handleGenerationUpdate(detail.status);
+        // When an image finishes, drop it straight into the chat
+        if (detail.status === "done" && detail.imagePath) {
+          setMessages((prev) => {
+            if (prev.some((m) => m.imageUrl === detail.imagePath)) return prev;
+            return [
+              ...prev,
+              {
+                id: `img-${detail.postItemId || Date.now()}`,
+                role: "assistant",
+                content: "🎨 Зображення готове",
+                createdAt: new Date().toISOString(),
+                imageUrl: detail.imagePath,
+              },
+            ];
+          });
+        }
       }
     };
     window.addEventListener("sse_event", handler);
@@ -283,6 +300,15 @@ export function ChatPanel() {
               )}
             >
               {msg.content}
+              {msg.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={msg.imageUrl}
+                  alt="Згенероване зображення"
+                  className="mt-2 rounded-lg max-w-full border border-border"
+                  loading="lazy"
+                />
+              )}
             </div>
           ))}
 
