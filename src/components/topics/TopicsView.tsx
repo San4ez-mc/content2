@@ -21,6 +21,8 @@ interface Props {
 
 const RUBRICS = [
   { key: "galuzi", label: "🏗 Автоматизація по галузях" },
+  { key: "benefits", label: "📈 Користь автоматизації" },
+  { key: "problems", label: "🧩 Проблеми в командах" },
   { key: "nuances", label: "⚙️ Нюанси автоматизації" },
   { key: "cases", label: "📁 Кейси з практики" },
   { key: "theoretical", label: "🤔 Теоретичні ситуації" },

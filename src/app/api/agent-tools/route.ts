@@ -274,7 +274,8 @@ async function saveRule(projectId: string, params: Record<string, unknown>) {
 }
 
 const RUBRIC_LABELS: Record<string, string> = {
-  galuzi: "Автоматизація по галузях", nuances: "Нюанси автоматизації", cases: "Кейси з практики",
+  galuzi: "Автоматизація по галузях", benefits: "Користь автоматизації", problems: "Проблеми в командах",
+  nuances: "Нюанси автоматизації", cases: "Кейси з практики",
   theoretical: "Теоретичні ситуації", heroes: "Цікаві герої", tools: "Інструменти та новини", personal: "Особисте / філософія",
 };
 
