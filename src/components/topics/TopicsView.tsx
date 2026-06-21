@@ -29,6 +29,7 @@ const RUBRICS = [
   { key: "heroes", label: "🦸 Цікаві герої" },
   { key: "tools", label: "🛠 Інструменти та новини" },
   { key: "personal", label: "🏍 Особисте / філософія" },
+  { key: "sales", label: "💰 Продажі / Продукти" },
 ];
 
 const STATUSES = [

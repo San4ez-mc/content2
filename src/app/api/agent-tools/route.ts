@@ -277,6 +277,7 @@ const RUBRIC_LABELS: Record<string, string> = {
   galuzi: "Автоматизація по галузях", benefits: "Користь автоматизації", problems: "Проблеми в командах",
   nuances: "Нюанси автоматизації", cases: "Кейси з практики",
   theoretical: "Теоретичні ситуації", heroes: "Цікаві герої", tools: "Інструменти та новини", personal: "Особисте / філософія",
+  sales: "Продажі / Продукти (BOFU — заклик до дії)",
 };
 
 // Returns unused topics (idea/planned) grouped by rubric, for the generator to draw from.
