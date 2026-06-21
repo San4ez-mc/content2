@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
-const TG_FLOWS_URL = "https://flows.fineko.space/webhook/bot/content-scheduler-v2";
+const TG_FLOWS_URL = "https://flows.fineko.space/webhook/bot/content-scheduler";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("x-scheduler-token") || req.nextUrl.searchParams.get("token");
