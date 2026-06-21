@@ -48,6 +48,7 @@ model Project {
   invitations      Invitation[]
   knowledgeEntries KnowledgeEntry[]
   contentTypes     ContentType[]
+  contentTopics    ContentTopic[]
 
   @@map("projects")
 }
@@ -334,6 +335,27 @@ model ContentType {
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("content_types")
+}
+
+// Банк тем: рубрика (напрямок) → тема → пост. Editable per-project in /topics.
+model ContentTopic {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  rubric      String   // напрямок: galuzi|nuances|cases|theoretical|heroes|tools|personal
+  title       String   // конкретна тема
+  notes       String?  @db.Text
+  platforms   Json     @default("[]") // опційно: для яких мереж тема
+  status      String   @default("idea") // idea | planned | used
+  timesUsed   Int      @default(0) @map("times_used")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("content_topics")
 }
 
 // ─── Publication (future) ───────────────────────────────

@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 const NAV = [
   { href: "/", label: "Контент" },
   { href: "/categories", label: "Категорії" },
+  { href: "/topics", label: "Теми" },
   { href: "/storage", label: "Сховище" },
   { href: "/content-types", label: "Типи" },
   { href: "/tools", label: "Воронки" },

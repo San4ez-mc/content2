@@ -40,6 +40,9 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "list_media": return await listMedia(projectId);
       case "get_rules": return await getRules(projectId, params);
       case "save_rule": return await saveRule(projectId, params);
+      case "get_topics": return await getTopics(projectId, params);
+      case "get_structures": return await getStructures(projectId);
+      case "mark_topics_used": return await markTopicsUsed(projectId, params);
       default:
         return NextResponse.json({ ok: false, error: "Unknown action: " + action });
     }
@@ -268,6 +271,55 @@ async function saveRule(projectId: string, params: Record<string, unknown>) {
     data: { projectId, category, title, content, addedBy: "bot" },
   });
   return NextResponse.json({ ok: true, id: entry.id, title: entry.title });
+}
+
+const RUBRIC_LABELS: Record<string, string> = {
+  galuzi: "Автоматизація по галузях", nuances: "Нюанси автоматизації", cases: "Кейси з практики",
+  theoretical: "Теоретичні ситуації", heroes: "Цікаві герої", tools: "Інструменти та новини", personal: "Особисте / філософія",
+};
+
+// Returns unused topics (idea/planned) grouped by rubric, for the generator to draw from.
+async function getTopics(projectId: string, params: Record<string, unknown>) {
+  const limit = Math.min(Number(params.limit || 60), 200);
+  const topics = await prisma.contentTopic.findMany({
+    where: { projectId, isActive: true, status: { not: "used" } },
+    orderBy: [{ status: "asc" }, { timesUsed: "asc" }, { sortOrder: "asc" }],
+    take: limit,
+  });
+  const byRubric: Record<string, string[]> = {};
+  for (const t of topics) {
+    const lbl = RUBRIC_LABELS[t.rubric] || t.rubric;
+    (byRubric[lbl] ||= []).push(t.title);
+  }
+  const text = Object.entries(byRubric).map(([r, list]) => `${r}:\n- ${list.join("\n- ")}`).join("\n\n");
+  return NextResponse.json({ ok: true, count: topics.length, topics: topics.map((t) => ({ id: t.id, rubric: t.rubric, title: t.title })), text });
+}
+
+// Returns active post structures (content_types) as guidance text.
+async function getStructures(projectId: string) {
+  const types = await prisma.contentType.findMany({ where: { projectId, isActive: true }, orderBy: [{ sortOrder: "asc" }] });
+  const text = types.map((t) => {
+    const pl = Array.isArray(t.platforms) ? (t.platforms as string[]).join(", ") : "";
+    return `• ${t.name}${pl ? ` [${pl}]` : ""}${t.structure ? `: ${t.structure}` : t.description ? `: ${t.description}` : ""}`;
+  }).join("\n");
+  return NextResponse.json({ ok: true, count: types.length, text });
+}
+
+// Marks topics as used (by title match, case-insensitive) — called after generation.
+async function markTopicsUsed(projectId: string, params: Record<string, unknown>) {
+  const titles = Array.isArray(params.titles) ? (params.titles as string[]) : [];
+  if (titles.length === 0) return NextResponse.json({ ok: true, marked: 0 });
+  let marked = 0;
+  for (const raw of titles) {
+    const title = String(raw || "").trim();
+    if (!title) continue;
+    const res = await prisma.contentTopic.updateMany({
+      where: { projectId, title: { equals: title, mode: "insensitive" } },
+      data: { status: "used", timesUsed: { increment: 1 }, lastUsedAt: new Date() },
+    });
+    marked += res.count;
+  }
+  return NextResponse.json({ ok: true, marked });
 }
 
 function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any, telegramChatId = "", telegramBotToken = "") {

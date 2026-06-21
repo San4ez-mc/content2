@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", icon: "📅", label: "Контент" },
   { href: "/categories", icon: "📁", label: "Категорії" },
+  { href: "/topics", icon: "💡", label: "Теми" },
   { href: "/networks", icon: "🌐", label: "Мережі" },
   { href: "/stats", icon: "📊", label: "Статистика" },
   { href: "/storage", icon: "🗄️", label: "Сховище" },
