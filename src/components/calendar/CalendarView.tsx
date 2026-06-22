@@ -291,8 +291,8 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
 
       {/* Calendar grid */}
       <div className="flex-1 overflow-auto p-3">
-        {/* DOW headers */}
-        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        {/* DOW headers — hidden on mobile (days stack vertically there) */}
+        <div className="hidden sm:grid grid-cols-7 gap-1.5 mb-1.5">
           {DOW.map((d) => (
             <div key={d} className="text-center text-xs font-medium text-fg-muted py-1">
               {d}
@@ -300,10 +300,10 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
           ))}
         </div>
 
-        {/* Days grid */}
-        <div className="grid grid-cols-7 gap-1.5">
+        {/* Days grid — 1 column on mobile (stack), 7 on desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-1.5">
           {paddedDays.map((day, idx) => {
-            if (!day) return <div key={`pad-${idx}`} />;
+            if (!day) return <div key={`pad-${idx}`} className="hidden sm:block" />;
 
             const dateStr = format(day, "yyyy-MM-dd");
             const today = isToday(day);
@@ -316,7 +316,7 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
               <div
                 key={dateStr}
                 className={cn(
-                  "min-h-[140px] rounded-lg border p-2 transition-colors group",
+                  "min-h-0 sm:min-h-[140px] rounded-lg border p-2 transition-colors group",
                   today
                     ? "border-accent/50 bg-accent/5"
                     : "border-border hover:border-border/80 bg-canvas-subtle",
@@ -333,18 +333,23 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
                   if (postId && fromDate !== dateStr) handleDropOnDate(postId, dateStr);
                 }}
               >
-                {/* Day number */}
+                {/* Day number (+ weekday/date label on mobile) */}
                 <div className="flex items-center justify-between mb-1.5">
-                  <span
-                    className={cn(
-                      "text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full",
-                      today
-                        ? "bg-accent text-white"
-                        : "text-fg-muted"
-                    )}
-                  >
-                    {format(day, "d")}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={cn(
+                        "text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full shrink-0",
+                        today
+                          ? "bg-accent text-white"
+                          : "text-fg-muted"
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+                    <span className="sm:hidden text-xs font-medium text-fg-muted capitalize truncate">
+                      {format(day, "EEEE, d MMMM", { locale: uk })}
+                    </span>
+                  </div>
                   <button
                     onClick={() => setQuickCreateDate(dateStr)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-fg-subtle hover:text-accent w-5 h-5 flex items-center justify-center rounded hover:bg-border/40"
