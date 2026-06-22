@@ -37,6 +37,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "delete_post": return await deletePost(projectId, params);
       case "delete_posts": return await deletePosts(projectId, params);
       case "regenerate_image": return await regenerateImage(projectId, params, telegramChatId, telegramBotToken);
+      case "send_media": return await sendMedia(projectId, params, telegramChatId, telegramBotToken);
       case "list_media": return await listMedia(projectId);
       case "get_rules": return await getRules(projectId, params);
       case "save_rule": return await saveRule(projectId, params);
@@ -271,6 +272,32 @@ async function saveRule(projectId: string, params: Record<string, unknown>) {
     data: { projectId, category, title, content, addedBy: "bot" },
   });
   return NextResponse.json({ ok: true, id: entry.id, title: entry.title });
+}
+
+// Re-send a post's already-generated image(s) directly to the Telegram chat.
+async function sendMedia(projectId: string, params: Record<string, unknown>, telegramChatId = "", telegramBotToken = "") {
+  if (!telegramChatId || !telegramBotToken) {
+    return NextResponse.json({ ok: false, error: "Доступно лише в Telegram-боті (немає chatId)" });
+  }
+  const g = await findByNumberOrId(projectId, params);
+  if (!g) return NextResponse.json({ ok: false, error: "Post not found" });
+  const CONTENT2 = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+  let sent = 0;
+  const errors: string[] = [];
+  for (const item of (g.items || [])) {
+    if (!item.imagePath) continue;
+    const url = item.imagePath.startsWith("http") ? item.imagePath : CONTENT2 + item.imagePath;
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: String(telegramChatId), photo: url }),
+      });
+      const j: any = await r.json();
+      if (j.ok) sent++; else errors.push(j.description || "tg error");
+    } catch (e: any) { errors.push(e.message); }
+  }
+  return NextResponse.json({ ok: sent > 0, number: g.number, sent, errors });
 }
 
 const RUBRIC_LABELS: Record<string, string> = {
