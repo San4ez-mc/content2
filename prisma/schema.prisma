@@ -293,6 +293,7 @@ model ScheduleSettings {
   telegramChatId   String?  @map("telegram_chat_id")
   digestTime       String?  @map("digest_time")
   digestChatId     String?  @map("digest_chat_id")
+  lastDigestDate   String?  @map("last_digest_date")
   updatedAt        DateTime @updatedAt @map("updated_at")
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

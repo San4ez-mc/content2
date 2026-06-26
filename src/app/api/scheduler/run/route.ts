@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
   for (const schedule of schedules) {
     const dayName = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][kyivNow.getDay()];
 
-    // Check morning digest
-    if (schedule.digestTime && schedule.digestChatId) {
+    // Check morning digest — skip if already sent today (idempotent against double-fire in the ±5 window)
+    if (schedule.digestTime && schedule.digestChatId && schedule.lastDigestDate !== todayStr) {
       const [dh, dm] = schedule.digestTime.split(":").map(Number);
       const digestMin = dh * 60 + dm;
       const currentMin = kyivNow.getHours() * 60 + kyivNow.getMinutes();
@@ -41,6 +41,11 @@ export async function POST(req: NextRequest) {
         });
 
         if (todayPosts.length > 0) {
+          // Mark as sent BEFORE delivery so a concurrent/repeated run in the window can't duplicate
+          await prisma.scheduleSettings.update({
+            where: { id: schedule.id },
+            data: { lastDigestDate: todayStr },
+          });
           try {
             const res = await fetch(TG_FLOWS_URL, {
               method: "POST",
@@ -61,8 +66,19 @@ export async function POST(req: NextRequest) {
                 today: todayStr,
               }),
             });
+            // Delivery failed — revert the marker so the next cron tick can retry today
+            if (!res.ok) {
+              await prisma.scheduleSettings.update({
+                where: { id: schedule.id },
+                data: { lastDigestDate: schedule.lastDigestDate },
+              });
+            }
             results.push({ projectId: schedule.projectId, mode: "digest", posts: todayPosts.length, ok: res.ok });
           } catch (e: any) {
+            await prisma.scheduleSettings.update({
+              where: { id: schedule.id },
+              data: { lastDigestDate: schedule.lastDigestDate },
+            });
             results.push({ projectId: schedule.projectId, mode: "digest", error: e.message });
           }
         }
