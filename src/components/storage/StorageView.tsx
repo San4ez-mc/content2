@@ -86,6 +86,32 @@ export function StorageView({ projectId }: Props) {
   const folders = data?.folders || [];
   const dateGroups = groupByDate(items);
 
+  // Flat list of images (display order) for lightbox carousel navigation
+  const imageList = dateGroups.flatMap((g) => g.items).filter((it) => it.mimeType.startsWith("image/"));
+  const lightboxIndex = lightbox ? imageList.findIndex((i) => i.id === lightbox.id) : -1;
+
+  const showLightboxAt = useCallback((delta: number) => {
+    setLightbox((cur) => {
+      if (!cur) return cur;
+      const idx = imageList.findIndex((i) => i.id === cur.id);
+      const next = idx + delta;
+      if (idx < 0 || next < 0 || next >= imageList.length) return cur;
+      return imageList[next];
+    });
+  }, [imageList]);
+
+  // Arrow keys ←/→ navigate, Escape closes the lightbox
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); showLightboxAt(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); showLightboxAt(1); }
+      else if (e.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox, showLightboxAt]);
+
   async function upload(files: FileList) {
     setUploading(true);
     try {
@@ -326,6 +352,7 @@ export function StorageView({ projectId }: Props) {
                             selected={selected.has(item.id)}
                             onSelect={() => toggleSelect(item.id)}
                             onClick={() => setPreview(item)}
+                            onOpen={() => isImage(item.mimeType) ? setLightbox(item) : setPreview(item)}
                             isImage={isImage(item.mimeType)}
                           />
                         ))}
@@ -339,6 +366,7 @@ export function StorageView({ projectId }: Props) {
                             selected={selected.has(item.id)}
                             onSelect={() => toggleSelect(item.id)}
                             onClick={() => setPreview(item)}
+                            onOpen={() => isImage(item.mimeType) ? setLightbox(item) : setPreview(item)}
                             onDelete={() => deleteItem(item.id)}
                             isImage={isImage(item.mimeType)}
                           />
@@ -353,22 +381,49 @@ export function StorageView({ projectId }: Props) {
         </div>
       </div>
 
-      {/* Lightbox */}
+      {/* Lightbox carousel */}
       {lightbox && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
           onClick={() => setLightbox(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white/70 hover:text-white text-3xl leading-none"
-            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 text-white/70 hover:text-white text-3xl leading-none z-10"
+            onClick={(e) => { e.stopPropagation(); setLightbox(null); }}
+            aria-label="Закрити"
           >×</button>
+
+          {lightboxIndex > 0 && (
+            <button
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-5xl leading-none z-10 px-3 py-2 select-none"
+              onClick={(e) => { e.stopPropagation(); showLightboxAt(-1); }}
+              aria-label="Попередня"
+            >‹</button>
+          )}
+
+          {lightboxIndex < imageList.length - 1 && (
+            <button
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-5xl leading-none z-10 px-3 py-2 select-none"
+              onClick={(e) => { e.stopPropagation(); showLightboxAt(1); }}
+              aria-label="Наступна"
+            >›</button>
+          )}
+
           <img
             src={lightbox.filePath}
             alt={lightbox.fileName}
-            className="max-w-[95vw] max-h-[95vh] object-contain rounded-xl shadow-2xl"
+            className="max-w-[92vw] max-h-[92vh] object-contain rounded-xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+
+          <div className="absolute bottom-4 inset-x-0 flex flex-col items-center gap-1 pointer-events-none">
+            {imageList.length > 1 && (
+              <span className="text-white/90 text-xs bg-black/40 rounded-full px-3 py-1">
+                {lightboxIndex + 1} / {imageList.length}
+              </span>
+            )}
+            <span className="text-white/60 text-[11px] max-w-[80vw] truncate">{lightbox.fileName}</span>
+          </div>
         </div>
       )}
 
@@ -435,14 +490,16 @@ export function StorageView({ projectId }: Props) {
   );
 }
 
-function GridItem({ item, selected, onSelect, onClick, isImage }: {
-  item: MediaItem; selected: boolean; onSelect: () => void; onClick: () => void; isImage: boolean;
+function GridItem({ item, selected, onSelect, onClick, onOpen, isImage }: {
+  item: MediaItem; selected: boolean; onSelect: () => void; onClick: () => void; onOpen: () => void; isImage: boolean;
 }) {
   return (
     <div
       className={cn("relative rounded-xl overflow-hidden border-2 cursor-pointer group transition-all",
         selected ? "border-accent" : "border-transparent hover:border-border")}
       onClick={onClick}
+      onDoubleClick={onOpen}
+      title="Подвійний клік — відкрити на весь екран"
     >
       {isImage ? (
         <img src={item.filePath} alt={item.fileName} className="w-full aspect-square object-cover" loading="lazy" />
@@ -465,14 +522,16 @@ function GridItem({ item, selected, onSelect, onClick, isImage }: {
   );
 }
 
-function ListItem({ item, selected, onSelect, onClick, onDelete, isImage }: {
-  item: MediaItem; selected: boolean; onSelect: () => void; onClick: () => void; onDelete: () => void; isImage: boolean;
+function ListItem({ item, selected, onSelect, onClick, onOpen, onDelete, isImage }: {
+  item: MediaItem; selected: boolean; onSelect: () => void; onClick: () => void; onOpen: () => void; onDelete: () => void; isImage: boolean;
 }) {
   return (
     <div
       className={cn("flex items-center gap-3 p-2 rounded-lg border cursor-pointer group transition-colors",
         selected ? "border-accent bg-accent/5" : "border-transparent hover:bg-border/20")}
       onClick={onClick}
+      onDoubleClick={onOpen}
+      title="Подвійний клік — відкрити на весь екран"
     >
       <div
         className={cn("w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-opacity",
