@@ -442,9 +442,16 @@ export function StorageView({ projectId }: Props) {
                 className="w-full rounded-lg object-contain max-h-48 cursor-zoom-in"
                 onClick={() => setLightbox(preview)}
               />
+            ) : preview.mimeType.startsWith("video/") ? (
+              <video
+                src={preview.filePath}
+                controls
+                playsInline
+                className="w-full rounded-lg max-h-64 bg-black"
+              />
             ) : (
               <div className="w-full aspect-square bg-border/30 rounded-lg flex items-center justify-center text-3xl">
-                {preview.mimeType.startsWith("video/") ? "🎬" : "📄"}
+                📄
               </div>
             )}
             <div className="mt-3 space-y-2">
@@ -503,10 +510,13 @@ function GridItem({ item, selected, onSelect, onClick, onOpen, isImage }: {
     >
       {isImage ? (
         <img src={item.filePath} alt={item.fileName} className="w-full aspect-square object-cover" loading="lazy" />
-      ) : (
-        <div className="w-full aspect-square bg-border/30 flex items-center justify-center text-3xl">
-          {item.mimeType.startsWith("video/") ? "🎬" : "📄"}
+      ) : item.mimeType.startsWith("video/") ? (
+        <div className="relative w-full aspect-square bg-black">
+          <video src={item.filePath} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 flex items-center justify-center text-3xl pointer-events-none">▶️</div>
         </div>
+      ) : (
+        <div className="w-full aspect-square bg-border/30 flex items-center justify-center text-3xl">📄</div>
       )}
       <div
         className={cn("absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-opacity bg-white",

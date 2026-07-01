@@ -37,6 +37,35 @@ async function downloadAndSaveImage(
   return filePath;
 }
 
+async function downloadAndSaveVideo(
+  url: string,
+  subFolder: string,
+  projectId: string
+): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
+  const contentType = res.headers.get("content-type") || "video/mp4";
+  const ext = contentType.includes("webm") ? "webm" : contentType.includes("quicktime") ? "mov" : "mp4";
+  const buf = Buffer.from(await res.arrayBuffer());
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "media", subFolder);
+  await mkdir(uploadDir, { recursive: true });
+  const fileName = `generated_${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  await writeFile(path.join(uploadDir, fileName), buf);
+  const filePath = `/uploads/media/${subFolder}/${fileName}`;
+  await prisma.mediaItem.create({
+    data: {
+      projectId,
+      fileName,
+      filePath,
+      mimeType: contentType.startsWith("video/") ? contentType : `video/${ext}`,
+      folder: "generated",
+      aiGenerated: true,
+      tags: [],
+    },
+  });
+  return filePath;
+}
+
 async function saveBase64Image(
   base64: string,
   subFolder: string,
@@ -119,6 +148,23 @@ export async function POST(req: NextRequest) {
     imagePath = paths[0];
   }
 
+  // Video output (from HeyGen avatars, Kling B-roll, Gemini/Veo, Remotion, etc.)
+  // — persist to storage the same way images are, so every generation funnel lands in /storage.
+  let videoPath: string | null = null;
+  const externalVideoUrl: string | null = body.videoUrl || body.video_url || null;
+  if (!imagePath && externalVideoUrl) {
+    if (externalVideoUrl.startsWith("http")) {
+      try {
+        videoPath = await downloadAndSaveVideo(externalVideoUrl, subFolder, projectId);
+      } catch {
+        videoPath = externalVideoUrl;
+      }
+    } else {
+      videoPath = externalVideoUrl;
+    }
+    imagePath = videoPath; // post's media pointer (imagePath is the generic media path field)
+  }
+
   const errorMessage = body.errorMessage || body.error || null;
 
   const STATUS_MAP: Record<string, string> = { success: "done", ok: "done", error: "failed" };
@@ -193,13 +239,18 @@ export async function POST(req: NextRequest) {
   const tgBotToken = req.nextUrl.searchParams.get("telegramBotToken") || body.telegramBotToken || null;
   if (status === "done" && imagePath && tgChatId && tgBotToken) {
     try {
-      const imageFullUrl = imagePath.startsWith("http")
+      const mediaFullUrl = imagePath.startsWith("http")
         ? imagePath
         : (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + imagePath;
-      await fetch("https://api.telegram.org/bot" + tgBotToken + "/sendPhoto", {
+      const isVideo = !!videoPath || /\.(mp4|mov|webm)(\?|$)/i.test(mediaFullUrl);
+      const method = isVideo ? "sendVideo" : "sendPhoto";
+      const payload = isVideo
+        ? { chat_id: tgChatId, video: mediaFullUrl }
+        : { chat_id: tgChatId, photo: mediaFullUrl };
+      await fetch("https://api.telegram.org/bot" + tgBotToken + "/" + method, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: tgChatId, photo: imageFullUrl }),
+        body: JSON.stringify(payload),
       });
     } catch (tgErr: any) {
       console.error("[generation-event] Telegram delivery failed:", tgErr.message);
