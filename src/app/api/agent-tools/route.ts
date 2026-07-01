@@ -307,12 +307,17 @@ const RUBRIC_LABELS: Record<string, string> = {
   sales: "Продажі / Продукти (BOFU — заклик до дії)",
 };
 
-// Returns unused topics (idea/planned) grouped by rubric, for the generator to draw from.
+// Returns topics not used in the last 14 days (never-used topics first), grouped by rubric.
 async function getTopics(projectId: string, params: Record<string, unknown>) {
   const limit = Math.min(Number(params.limit || 60), 200);
+  const cooldownDays = Number(params.cooldownDays || 14);
+  const cooldownCutoff = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000);
   const topics = await prisma.contentTopic.findMany({
-    where: { projectId, isActive: true, status: { not: "used" } },
-    orderBy: [{ status: "asc" }, { timesUsed: "asc" }, { sortOrder: "asc" }],
+    where: {
+      projectId, isActive: true,
+      OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: cooldownCutoff } }],
+    },
+    orderBy: [{ lastUsedAt: { sort: "asc", nulls: "first" } }, { timesUsed: "asc" }, { sortOrder: "asc" }],
     take: limit,
   });
   const byRubric: Record<string, string[]> = {};
