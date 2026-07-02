@@ -10,8 +10,38 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const projectId = searchParams.get("projectId");
   const month = searchParams.get("month"); // YYYY-MM
+  const search = (searchParams.get("search") || "").trim();
 
-  if (!projectId || !month) return NextResponse.json([]);
+  if (!projectId) return NextResponse.json([]);
+
+  const include = {
+    items: { orderBy: { orderIndex: "asc" as const } },
+    socialNetwork: true,
+    category: true,
+    persona: true,
+  };
+
+  // Search mode — across ALL months. Matches post text, slide texts, or post number.
+  if (search) {
+    const num = /^#?\d+$/.test(search) ? parseInt(search.replace("#", ""), 10) : undefined;
+    const postGroups = await prisma.postGroup.findMany({
+      where: {
+        projectId,
+        OR: [
+          { items: { some: { content: { contains: search, mode: "insensitive" } } } },
+          { items: { some: { slideTitle: { contains: search, mode: "insensitive" } } } },
+          { items: { some: { slideSubtitle: { contains: search, mode: "insensitive" } } } },
+          ...(num !== undefined ? [{ number: num }] : []),
+        ],
+      },
+      include,
+      orderBy: { postDate: "desc" },
+      take: 100,
+    });
+    return NextResponse.json(postGroups);
+  }
+
+  if (!month) return NextResponse.json([]);
 
   const [year, mon] = month.split("-").map(Number);
   const dateFrom = new Date(year, mon - 1, 1);
@@ -19,12 +49,7 @@ export async function GET(req: NextRequest) {
 
   const postGroups = await prisma.postGroup.findMany({
     where: { projectId, postDate: { gte: dateFrom, lte: dateTo } },
-    include: {
-      items: { orderBy: { orderIndex: "asc" } },
-      socialNetwork: true,
-      category: true,
-      persona: true,
-    },
+    include,
     orderBy: { postDate: "asc" },
   });
 

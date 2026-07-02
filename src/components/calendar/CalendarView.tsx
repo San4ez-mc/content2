@@ -92,6 +92,19 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
     staleTime: 10_000,
   });
 
+  // Search across ALL months (by text / slide text / post number).
+  const [search, setSearch] = useState("");
+  const searchQ = search.trim();
+  const { data: searchResults = [], isFetching: searching } = useQuery<PostGroup[]>({
+    queryKey: ["searchPosts", activeProject.id, searchQ],
+    queryFn: async () => {
+      const r = await fetch(`/api/posts?projectId=${activeProject.id}&search=${encodeURIComponent(searchQ)}`);
+      return r.ok ? r.json() : [];
+    },
+    enabled: searchQ.length >= 2,
+    staleTime: 5_000,
+  });
+
   // SSE subscription for real-time updates
   useEffect(() => {
     if (sseRef.current) sseRef.current.close();
@@ -240,6 +253,24 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Search across all months */}
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="🔍 Пошук по постах…"
+              className="text-xs bg-canvas border border-border rounded-lg pl-2.5 pr-6 py-1 text-fg w-44 focus:w-60 transition-all focus:outline-none focus:border-accent"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg text-sm"
+                title="Очистити"
+              >
+                ×
+              </button>
+            )}
+          </div>
           {bulkSelected.size > 0 && (
             <div className="flex items-center gap-1 bg-canvas border border-border rounded-lg px-2 py-1">
               <span className="text-xs text-fg-muted">{bulkSelected.size} обрано</span>
@@ -289,8 +320,47 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
         </div>
       </div>
 
+      {/* Search results — replaces the calendar while searching */}
+      {searchQ.length >= 2 && (
+        <div className="flex-1 overflow-auto p-3">
+          <div className="text-xs text-fg-muted mb-2">
+            {searching ? "Шукаю…" : `Знайдено: ${searchResults.length}`}
+            {searchResults.length >= 100 && " (показано перші 100)"}
+          </div>
+          <div className="flex flex-col gap-1.5 max-w-3xl">
+            {!searching && searchResults.length === 0 && (
+              <div className="text-sm text-fg-subtle py-8 text-center">Нічого не знайдено за «{searchQ}»</div>
+            )}
+            {searchResults.map((g) => {
+              const color = g.socialNetwork.color || PLATFORM_COLORS[g.socialNetwork.platformKey] || "#64748b";
+              const text = (g.items?.[0]?.content || g.items?.map((i) => i.slideTitle).filter(Boolean).join(" · ") || "").replace(/\n+/g, " ").trim();
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => setSelectedPost(g)}
+                  className="text-left flex items-start gap-2.5 p-2.5 rounded-lg border border-border hover:border-accent/60 hover:bg-border/20 transition-colors"
+                >
+                  <span className="text-[10px] font-semibold text-white px-1.5 py-0.5 rounded shrink-0 mt-0.5" style={{ backgroundColor: color }}>
+                    {g.socialNetwork.name}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[11px] text-fg-muted mb-0.5">
+                      {g.number != null && <span className="font-semibold text-fg">#{g.number}</span>}
+                      <span>{format(new Date(g.postDate), "d MMM yyyy", { locale: uk })}</span>
+                      <span className="text-fg-subtle">· {g.type}</span>
+                      <span className="text-fg-subtle">· {g.status}</span>
+                    </div>
+                    <div className="text-xs text-fg line-clamp-2">{text || "(без тексту)"}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Calendar grid */}
-      <div className="flex-1 overflow-auto p-3">
+      <div className={cn("flex-1 overflow-auto p-3", searchQ.length >= 2 && "hidden")}>
         {/* DOW headers — hidden on mobile (days stack vertically there) */}
         <div className="hidden sm:grid grid-cols-7 gap-1.5 mb-1.5">
           {DOW.map((d) => (
