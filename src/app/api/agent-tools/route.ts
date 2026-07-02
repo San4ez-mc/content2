@@ -44,6 +44,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_topics": return await getTopics(projectId, params);
       case "get_structures": return await getStructures(projectId);
       case "mark_topics_used": return await markTopicsUsed(projectId, params);
+      case "create_avatar_reel": return await createAvatarReel(params, telegramChatId, telegramBotToken);
       default:
         return NextResponse.json({ ok: false, error: "Unknown action: " + action });
     }
@@ -337,6 +338,23 @@ async function getStructures(projectId: string) {
     return `• ${t.name}${pl ? ` [${pl}]` : ""}${t.structure ? `: ${t.structure}` : t.description ? `: ${t.description}` : ""}`;
   }).join("\n");
   return NextResponse.json({ ok: true, count: types.length, text });
+}
+
+// Fires the avatar-Reel scenarist funnel: given a theme, the funnel (Claude) designs a
+// multi-scene vertical Reel with the owner's face preserved (Nano Banana Pro) + voice +
+// motion + subtitles + music + cover, and delivers it to the Telegram chat. Async — returns
+// immediately; the finished video arrives in TG in a few minutes.
+async function createAvatarReel(params: Record<string, unknown>, telegramChatId = "", telegramBotToken = "") {
+  const theme = String(params.theme || "").trim();
+  if (!theme) return NextResponse.json({ ok: false, error: "theme required" });
+  const body: any = { theme };
+  if (telegramChatId && telegramBotToken) body.deliverTo = { chatId: telegramChatId, botToken: telegramBotToken };
+  fetch(`${FLOWS_BASE}/content-avatar-reel-scenario`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+  return NextResponse.json({ ok: true, message: "🎬 Запустив створення відео-Reel з аватаром за твоїм сценарієм. Це займе кілька хвилин — готове відео (і обкладинку) надішлю сюди в чат." });
 }
 
 // Marks topics as used (by title match, case-insensitive) — called after generation.
