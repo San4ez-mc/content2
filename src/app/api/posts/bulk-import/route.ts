@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
+import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   const AUDIENCE_VALID = new Set(["cold", "warm1", "warm2", "hot1", "hot2"]);
 
-  type InsertedPost = { groupId: string; itemId: string; number: number; funnelSlug: string | null; funnelParams: Record<string, unknown> | null; content: string };
+  type InsertedPost = { groupId: string; itemId: string; number: number; funnelSlug: string | null; funnelParams: Record<string, unknown> | null; content: string; platform: string };
   const insertedPosts: InsertedPost[] = [];
   // Placeholder rows created at generation start (status generating_text) get
   // claimed and filled here instead of creating duplicate posts.
@@ -142,7 +143,20 @@ export async function POST(req: NextRequest) {
       funnelSlug: derivedFunnelSlug,
       funnelParams: funnelParams || buildParamsFromLegacy(p),
       content: p.content || "",
+      platform: platformKey,
     });
+  }
+
+  // Per-post deep-link tracking: swap any lead-magnet base link for a unique
+  // tracked link keyed to this post (best-effort, no-op if no magnets match).
+  for (const ins of insertedPosts) {
+    const tracked = await injectTrackedLinks({
+      projectId, postItemId: ins.itemId, postGroupId: ins.groupId, platform: ins.platform, content: ins.content,
+    });
+    if (tracked !== ins.content) {
+      ins.content = tracked;
+      await prisma.postItem.update({ where: { id: ins.itemId }, data: { content: tracked } }).catch(() => {});
+    }
   }
 
   // Notify calendar/UI clients so the page refreshes without reload

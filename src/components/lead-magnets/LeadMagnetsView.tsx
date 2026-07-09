@@ -50,6 +50,13 @@ export function LeadMagnetsView({ projectId }: Props) {
     staleTime: 30_000,
   });
 
+  const { data: stats } = useQuery<{ byMagnet?: { lead_magnet_id: string; links: number; clicks: number }[] }>({
+    queryKey: ["linkStats", projectId],
+    queryFn: () => fetch(`/api/link-stats?projectId=${projectId}`).then((r) => r.json()),
+    staleTime: 30_000,
+  });
+
+  const clicksByMagnet = new Map((stats?.byMagnet || []).map((s) => [s.lead_magnet_id, s]));
   const productName = (id: string) => products.find((p) => p.id === id)?.name || "—";
 
   async function toggleActive(m: LeadMagnet) {
@@ -119,6 +126,14 @@ export function LeadMagnetsView({ projectId }: Props) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-semibold text-fg">{m.name}</h3>
                         <span className="text-[10px] px-1.5 py-0.5 bg-accent/15 text-accent rounded">{productName(m.productId)}</span>
+                        {(() => {
+                          const s = clicksByMagnet.get(m.id);
+                          return s && s.clicks > 0 ? (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-success/15 text-success rounded" title={`${s.links} посилань`}>
+                              👆 {s.clicks} переходів
+                            </span>
+                          ) : null;
+                        })()}
                         {!m.isActive && <span className="text-[10px] px-1.5 py-0.5 bg-border text-fg-subtle rounded">вимкнено</span>}
                       </div>
                       {m.description && <p className="text-xs text-fg-muted mt-0.5">{m.description}</p>}

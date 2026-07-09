@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
+import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -165,6 +166,15 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
     },
     include: { socialNetwork: true, items: true },
   });
+
+  // Per-post deep-link tracking: swap any lead-magnet base link for a unique tracked link.
+  const tracked = await injectTrackedLinks({
+    projectId, postItemId: group.items[0].id, postGroupId: group.id, platform: platformKey, content: String(params.content || ""),
+  });
+  if (tracked !== String(params.content || "")) {
+    await prisma.postItem.update({ where: { id: group.items[0].id }, data: { content: tracked } }).catch(() => {});
+    group.items[0].content = tracked;
+  }
 
   if (needsGeneration) fireGeneration(group.items[0].id, group.id, funnelSlug!, funnelParams, telegramChatId, telegramBotToken);
   broadcastToProject(projectId, { type: "post_updated", source: "agent" });
