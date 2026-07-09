@@ -43,6 +43,8 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "save_rule": return await saveRule(projectId, params);
       case "get_topics": return await getTopics(projectId, params);
       case "get_structures": return await getStructures(projectId);
+      case "get_products": return await getProducts(projectId);
+      case "get_lead_magnets": return await getLeadMagnets(projectId, params);
       case "mark_topics_used": return await markTopicsUsed(projectId, params);
       case "create_avatar_reel": return await createAvatarReel(params, telegramChatId, telegramBotToken);
       default:
@@ -338,6 +340,68 @@ async function getStructures(projectId: string) {
     return `• ${t.name}${pl ? ` [${pl}]` : ""}${t.structure ? `: ${t.structure}` : t.description ? `: ${t.description}` : ""}`;
   }).join("\n");
   return NextResponse.json({ ok: true, count: types.length, text });
+}
+
+// Builds the base Telegram deep-link for a lead magnet: t.me/<bot>?start=<param>
+function leadMagnetLink(m: { botUsername: string | null; baseStartParam: string | null; funnelSlug: string | null }) {
+  if (!m.botUsername) return null;
+  const bot = m.botUsername.replace(/^@/, "");
+  const param = m.baseStartParam || m.funnelSlug || "";
+  return `https://t.me/${bot}${param ? `?start=${param}` : ""}`;
+}
+
+// Products we sell — so the content plan is oriented toward selling them.
+async function getProducts(projectId: string) {
+  const products = await prisma.product.findMany({
+    where: { projectId, isActive: true },
+    include: { leadMagnets: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }] } },
+    orderBy: [{ sortOrder: "asc" }],
+  });
+  const text = products.map((p) => {
+    const head = `• ${p.name}${p.price ? ` (${p.price})` : ""}${p.description ? ` — ${p.description}` : ""}`;
+    const mags = p.leadMagnets.map((m) => {
+      const link = leadMagnetLink(m);
+      return `    ◦ Лід-магніт «${m.name}»${m.description ? `: ${m.description}` : ""}${link ? ` → ${link}` : ""}`;
+    }).join("\n");
+    return mags ? `${head}\n${mags}` : head;
+  }).join("\n");
+  return NextResponse.json({
+    ok: true,
+    count: products.length,
+    products: products.map((p) => ({
+      id: p.id, name: p.name, price: p.price, description: p.description, audience: p.audience,
+      lead_magnets: p.leadMagnets.map((m) => ({
+        id: m.id, name: m.name, description: m.description,
+        funnel_slug: m.funnelSlug, bot_username: m.botUsername, link: leadMagnetLink(m),
+      })),
+    })),
+    text,
+  });
+}
+
+// Lead magnets flat list (optionally by productId) with ready-to-use deep-links.
+// Content bots use this as the SOURCE OF TRUTH for sales-post links & angles — not the KB.
+async function getLeadMagnets(projectId: string, params: Record<string, unknown>) {
+  const productId = params.productId ? String(params.productId) : undefined;
+  const magnets = await prisma.leadMagnet.findMany({
+    where: { projectId, isActive: true, ...(productId ? { productId } : {}) },
+    include: { product: true },
+    orderBy: [{ sortOrder: "asc" }],
+  });
+  const text = magnets.map((m) => {
+    const link = leadMagnetLink(m);
+    return `• «${m.name}» (продукт: ${m.product?.name || "—"})${m.description ? ` — ${m.description}` : ""}${link ? `\n  Посилання: ${link}` : ""}`;
+  }).join("\n");
+  return NextResponse.json({
+    ok: true,
+    count: magnets.length,
+    lead_magnets: magnets.map((m) => ({
+      id: m.id, name: m.name, description: m.description,
+      product: m.product?.name || null, product_id: m.productId,
+      funnel_slug: m.funnelSlug, bot_username: m.botUsername, link: leadMagnetLink(m),
+    })),
+    text,
+  });
 }
 
 // Fires the avatar-Reel scenarist funnel: given a theme, the funnel (Claude) designs a

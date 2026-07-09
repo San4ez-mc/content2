@@ -10,6 +10,8 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const NAV = [
   { href: "/", label: "Контент" },
+  { href: "/products", label: "Продукти" },
+  { href: "/lead-magnets", label: "Лід-магніти" },
   { href: "/categories", label: "Категорії" },
   { href: "/topics", label: "Теми" },
   { href: "/storage", label: "Сховище" },

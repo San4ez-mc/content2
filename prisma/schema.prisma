@@ -49,6 +49,8 @@ model Project {
   knowledgeEntries KnowledgeEntry[]
   contentTypes     ContentType[]
   contentTopics    ContentTopic[]
+  products         Product[]
+  leadMagnets      LeadMagnet[]
 
   @@map("projects")
 }
@@ -357,6 +359,49 @@ model ContentTopic {
 
   @@index([projectId, status])
   @@map("content_topics")
+}
+
+// ─── Products & Lead Magnets ────────────────────────────
+// Продукти, які продаємо через соцмережі. Контент-план орієнтується на них.
+model Product {
+  id          String       @id @default(cuid())
+  projectId   String       @map("project_id")
+  name        String
+  description String?      @db.Text // що це, кому, ключова цінність — щоб контент вів до продажу
+  price       String?      // вільний текст: "2500 грн", "від $500", "за запитом"
+  audience    String?      @db.Text // для кого продукт (ЦА)
+  isActive    Boolean      @default(true) @map("is_active")
+  sortOrder   Int          @default(0) @map("sort_order")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  leadMagnets LeadMagnet[]
+
+  @@index([projectId, isActive])
+  @@map("products")
+}
+
+// Лід-магніти прив'язані до продукту (1 продукт → N магнітів).
+// Кожен веде на воронку у flows; звідси контент-бот бере посилання й тему для постів.
+model LeadMagnet {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  productId      String   @map("product_id")
+  name           String
+  description    String?  @db.Text // «про що писати» — суть магніту, обіцянка, кут
+  funnelSlug     String?  @map("funnel_slug") // slug воронки у flows (bot-karta-sales тощо)
+  botUsername    String?  @map("bot_username") // напр. den_fineko_bot → t.me/<bot>?start=...
+  baseStartParam String?  @map("base_start_param") // базовий payload deep-link; дефолт = funnelSlug
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, isActive])
+  @@index([productId])
+  @@map("lead_magnets")
 }
 
 // ─── Publication (future) ───────────────────────────────
