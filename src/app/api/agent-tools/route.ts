@@ -169,7 +169,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
 
   // Per-post deep-link tracking: swap any lead-magnet base link for a unique tracked link.
   const tracked = await injectTrackedLinks({
-    projectId, postItemId: group.items[0].id, postGroupId: group.id, platform: platformKey, content: String(params.content || ""),
+    projectId, postItemId: group.items[0].id, postGroupId: group.id, postNumber: group.number, platform: platformKey, content: String(params.content || ""),
   });
   if (tracked !== String(params.content || "")) {
     await prisma.postItem.update({ where: { id: group.items[0].id }, data: { content: tracked } }).catch(() => {});

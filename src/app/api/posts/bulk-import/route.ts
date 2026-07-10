@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
   // tracked link keyed to this post (best-effort, no-op if no magnets match).
   for (const ins of insertedPosts) {
     const tracked = await injectTrackedLinks({
-      projectId, postItemId: ins.itemId, postGroupId: ins.groupId, platform: ins.platform, content: ins.content,
+      projectId, postItemId: ins.itemId, postGroupId: ins.groupId, postNumber: ins.number, platform: ins.platform, content: ins.content,
     });
     if (tracked !== ins.content) {
       ins.content = tracked;

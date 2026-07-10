@@ -11,6 +11,7 @@ export async function injectTrackedLinks(opts: {
   projectId: string;
   postItemId: string;
   postGroupId?: string | null;
+  postNumber?: number | null;
   platform?: string | null;
   content: string;
 }): Promise<string> {
@@ -39,6 +40,7 @@ export async function injectTrackedLinks(opts: {
           botUsername: bot,
           postItemId: opts.postItemId,
           postGroupId: opts.postGroupId || null,
+          postNumber: opts.postNumber ?? null,
           platform: opts.platform || null,
           baseParam: param,
         }),
