@@ -172,28 +172,35 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Fire generation for each post that needs it (fire-and-forget)
+  // Fire generation for each post that needs it (fire-and-forget).
+  // The PLATFORM (generation-event webhook) is the single notifier: it delivers the
+  // finished media + "✅ Готово" or "❌ помилка + текст" to the chat. We therefore
+  // route the chat creds through the callbackUrl and store them on the item (_deliver),
+  // and DO NOT ask the funnel to deliver directly (no more deliverTo) — that avoids
+  // double-delivery and the "done but never delivered" gap.
+  const deliver = (deliverTo?.botToken && deliverTo?.chatId)
+    ? { chatId: String(deliverTo.chatId), botToken: String(deliverTo.botToken) }
+    : null;
+
   for (const ins of insertedPosts) {
     if (!ins.funnelSlug || ins.funnelSlug === "text_only") continue;
 
-    const callbackUrl = `${CONTENT2_URL}/api/webhooks/generation-event?token=${WEBHOOK_SECRET}&postItemId=${ins.itemId}`;
+    let callbackUrl = `${CONTENT2_URL}/api/webhooks/generation-event?token=${WEBHOOK_SECRET}&postItemId=${ins.itemId}`;
+    if (deliver) callbackUrl += `&telegramChatId=${encodeURIComponent(deliver.chatId)}&telegramBotToken=${encodeURIComponent(deliver.botToken)}`;
     const webhookUrl = `${FLOWS_BASE}/${ins.funnelSlug}`;
+    const mergedParams: any = { ...(ins.funnelParams || {}) };
+    if (deliver) mergedParams._deliver = deliver;
     const payload = {
-      ...(ins.funnelParams || {}),
+      ...mergedParams,
       callbackUrl,
       postItemId: ins.itemId,
       postGroupId: ins.groupId,
-      // When the request came from a Telegram bot, deliver the finished image
-      // straight back to that chat (webhook.js deliverResultToTelegram).
-      ...(deliverTo?.botToken && deliverTo?.chatId
-        ? { deliverTo: { botToken: deliverTo.botToken, chatId: deliverTo.chatId, caption: (ins.content || "").slice(0, 200) } }
-        : {}),
     };
 
-    // Mark as generating
+    // Mark as generating + persist deliver target so the platform can always notify.
     prisma.postItem.update({
       where: { id: ins.itemId },
-      data: { generationStatus: "generating" },
+      data: { generationStatus: "generating", ...(deliver ? { funnelParams: mergedParams } : {}) },
     }).catch(() => {});
 
     // Fire generation webhook (fire-and-forget)
@@ -207,6 +214,12 @@ export async function POST(req: NextRequest) {
         where: { id: ins.itemId },
         data: { generationStatus: "failed", generationError: "Webhook trigger failed: " + err.message },
       }).catch(() => {});
+      if (deliver) {
+        fetch(`https://api.telegram.org/bot${deliver.botToken}/sendMessage`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: deliver.chatId, text: `❌ Не вдалося запустити генерацію медіа.\nПричина: ${err.message}` }),
+        }).catch(() => {});
+      }
     });
   }
 

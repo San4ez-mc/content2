@@ -8,6 +8,18 @@ import { broadcastToProject } from "@/lib/sse";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 
+async function sendTgText(botToken: string, chatId: string, text: string) {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+  } catch (e: any) {
+    console.error("[generation-event] Telegram text failed:", e.message);
+  }
+}
+
 async function downloadAndSaveImage(
   url: string,
   subFolder: string,
@@ -224,6 +236,38 @@ export async function POST(req: NextRequest) {
           },
         });
       }
+
+      // ── Platform is the single notifier: deliver the outcome to the TG chat ──
+      const stored = (existingPostItem.funnelParams && typeof existingPostItem.funnelParams === "object")
+        ? ((existingPostItem.funnelParams as any)._deliver || {}) : {};
+      const tgChatId = req.nextUrl.searchParams.get("telegramChatId") || body.telegramChatId || stored.chatId || null;
+      const tgBotToken = req.nextUrl.searchParams.get("telegramBotToken") || body.telegramBotToken || stored.botToken || null;
+
+      if (tgChatId && tgBotToken) {
+        if (status === "done" && imagePath) {
+          const mediaFullUrl = imagePath.startsWith("http")
+            ? imagePath
+            : (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + imagePath;
+          const isVideo = !!videoPath || /\.(mp4|mov|webm)(\?|$)/i.test(mediaFullUrl);
+          const caption = `✅ Готово — пост #${updated.group?.number ?? ""} (${networkName}, ${dateLabel})`;
+          const method = isVideo ? "sendVideo" : "sendPhoto";
+          const payload = isVideo
+            ? { chat_id: tgChatId, video: mediaFullUrl, caption }
+            : { chat_id: tgChatId, photo: mediaFullUrl, caption };
+          try {
+            await fetch(`https://api.telegram.org/bot${tgBotToken}/${method}`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+            });
+          } catch (tgErr: any) {
+            console.error("[generation-event] Telegram media delivery failed:", tgErr.message);
+            await sendTgText(tgBotToken, tgChatId, `✅ Медіа готове (${networkName}, ${dateLabel}), але не вдалося надіслати сюди. Відкрий у дашборді.`);
+          }
+        } else if (status === "done") {
+          await sendTgText(tgBotToken, tgChatId, `✅ Готово — ${networkName}, ${dateLabel}.`);
+        } else if (status === "failed") {
+          await sendTgText(tgBotToken, tgChatId, `❌ Не вдалося згенерувати медіа — ${networkName}, ${dateLabel}.\nПричина: ${errorMessage || "невідома помилка"}\n\nМожеш попросити перегенерувати.`);
+        }
+      }
     }
   } else {
     broadcastToProject(projectId, {
@@ -232,29 +276,6 @@ export async function POST(req: NextRequest) {
       status,
       imagePath,
     });
-  }
-
-  // ── Deliver image to Telegram if chat context provided ───────────────────
-  const tgChatId = req.nextUrl.searchParams.get("telegramChatId") || body.telegramChatId || null;
-  const tgBotToken = req.nextUrl.searchParams.get("telegramBotToken") || body.telegramBotToken || null;
-  if (status === "done" && imagePath && tgChatId && tgBotToken) {
-    try {
-      const mediaFullUrl = imagePath.startsWith("http")
-        ? imagePath
-        : (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + imagePath;
-      const isVideo = !!videoPath || /\.(mp4|mov|webm)(\?|$)/i.test(mediaFullUrl);
-      const method = isVideo ? "sendVideo" : "sendPhoto";
-      const payload = isVideo
-        ? { chat_id: tgChatId, video: mediaFullUrl }
-        : { chat_id: tgChatId, photo: mediaFullUrl };
-      await fetch("https://api.telegram.org/bot" + tgBotToken + "/" + method, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch (tgErr: any) {
-      console.error("[generation-event] Telegram delivery failed:", tgErr.message);
-    }
   }
 
   return NextResponse.json({ ok: true, postItemId, status, imagePath });

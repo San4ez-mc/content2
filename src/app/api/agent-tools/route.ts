@@ -454,14 +454,30 @@ function fireGeneration(itemId: string, groupId: string, funnelSlug: string, fun
   let callbackUrl = CONTENT2 + "/api/webhooks/generation-event?token=" + WH_SECRET + "&postItemId=" + itemId;
   if (telegramChatId) callbackUrl += "&telegramChatId=" + encodeURIComponent(telegramChatId);
   if (telegramBotToken) callbackUrl += "&telegramBotToken=" + encodeURIComponent(telegramBotToken);
+
+  // Persist the deliver target on the item so the PLATFORM can always notify the
+  // chat on completion/failure/timeout — even if the callback arrives without creds.
+  const merged = { ...(funnelParams || {}) };
+  if (telegramChatId && telegramBotToken) merged._deliver = { chatId: telegramChatId, botToken: telegramBotToken };
+  if (telegramChatId && telegramBotToken) {
+    prisma.postItem.update({ where: { id: itemId }, data: { funnelParams: merged as any } }).catch(() => {});
+  }
+
   fetch(`${FLOWS_BASE}/${funnelSlug}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...(funnelParams || {}), callbackUrl, postItemId: itemId, postGroupId: groupId }),
+    body: JSON.stringify({ ...merged, callbackUrl, postItemId: itemId, postGroupId: groupId }),
   }).catch((err) => {
     prisma.postItem.update({
       where: { id: itemId },
       data: { generationStatus: "failed", generationError: "Webhook trigger failed: " + err.message },
     }).catch(() => {});
+    // Platform notifies the chat directly — the funnel was never reached, so no callback will come.
+    if (telegramChatId && telegramBotToken) {
+      fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: telegramChatId, text: `❌ Не вдалося запустити генерацію медіа.\nПричина: ${err.message}` }),
+      }).catch(() => {});
+    }
   });
 }
