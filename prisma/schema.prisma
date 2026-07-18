@@ -151,6 +151,18 @@ model PostGroup {
   audience        String?       // cold, warm1, warm2, hot1, hot2
   status          PostStatus    @default(draft)
   scheduleTime    String?       @map("schedule_time") // "09:00"
+  // Ф3.1 (#305) strategic-атоми на рівні ЮНІТА (Варіант A); PostItem лишається render-шаром
+  hookA           String?       @map("hook_a") @db.Text
+  hookB           String?       @map("hook_b") @db.Text
+  hookSelected    String?       @map("hook_selected")
+  cta             String?       @db.Text
+  structureId     String?       @map("structure_id")
+  evidenceType    String?       @map("evidence_type") // case | example | story
+  caseId          String?       @map("case_id")
+  scores          Json          @default("{}")
+  arcId           String?       @map("arc_id")
+  experimentId    String?       @map("experiment_id")
+  skeleton        Boolean       @default(false) // двофазна генерація: скелет без текстів
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
   project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -200,6 +212,97 @@ model PostItem {
 
   @@index([groupId, orderIndex])
   @@map("post_items")
+}
+
+// Ф3.1/Ф1.5 Кейси — тільки записи з id (ніколи «памʼять моделі»)
+model Case {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  title         String
+  niche         String?
+  problem       String?  @db.Text
+  solution      String?  @db.Text
+  metrics       Json     @default("{}") // цифри-результати
+  allowedClaims String?  @map("allowed_claims") @db.Text // дозволені формулювання
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("cases")
+}
+
+// Ф1.3 Сторіз-арки (серія повʼязаних юнітів)
+model StoryArc {
+  id        String    @id @default(cuid())
+  projectId String    @map("project_id")
+  goal      String?
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  unitIds   Json      @default("[]") @map("unit_ids")
+  status    String    @default("planned")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@map("story_arcs")
+}
+
+// Ф3.2 Експерименти + анти-цементування
+model Experiment {
+  id           String    @id @default(cuid())
+  projectId    String    @map("project_id")
+  hypothesis   String    @db.Text
+  minPosts     Int       @default(5) @map("min_posts")
+  metric       String?
+  baseline     Float?
+  status       String    @default("testing")
+  confidence   Float?
+  sampleSize   Int       @default(0) @map("sample_size")
+  lastVerified DateTime? @map("last_verified")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([projectId, status])
+  @@map("experiments")
+}
+
+model WinningPattern {
+  id           String    @id @default(cuid())
+  projectId    String    @map("project_id")
+  kind         String // hook | structure | topic | pain
+  platform     String?
+  score        Float     @default(0)
+  confidence   Float?
+  sampleSize   Int       @default(0) @map("sample_size")
+  lastVerified DateTime? @map("last_verified")
+  status       String    @default("needs_retest") // confirmed | needs_retest
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([projectId, kind])
+  @@map("winning_patterns")
+}
+
+// Ф1.8 Журнал правок (local/global)
+model EditLog {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  scope     String   @default("local") // local | global
+  category  String? // style | factual | cta | structure | visual
+  unitId    String?  @map("unit_id")
+  text      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@map("edit_logs")
+}
+
+// Ф2.4 Ідемпотентність вебхуків генерації (unit_id, attempt)
+model ProcessedWebhook {
+  id        String   @id @default(cuid())
+  unitId    String   @map("unit_id")
+  attempt   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([unitId, attempt])
+  @@map("processed_webhooks")
 }
 
 enum GenerationStatus {
