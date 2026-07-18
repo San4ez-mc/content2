@@ -120,6 +120,17 @@ export async function POST(req: NextRequest) {
     body.postItemId ||
     null;
 
+  // Ф2.4 ідемпотентність вебхуків: (postItemId, attempt) обробляється рівно один раз.
+  const attempt = Number(body.attempt ?? req.nextUrl.searchParams.get("attempt") ?? 1) || 1;
+  if (postItemId) {
+    try {
+      await prisma.processedWebhook.create({ data: { unitId: postItemId, attempt } });
+    } catch {
+      // унікальний конфлікт (unitId, attempt) → цей вебхук уже оброблено, ігноруємо повтор
+      return NextResponse.json({ ok: true, idempotent: true, postItemId, attempt });
+    }
+  }
+
   let projectId = body.projectId || req.nextUrl.searchParams.get("projectId") || "misc";
   let existingPostItem: any = null;
   if (postItemId) {
