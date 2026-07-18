@@ -163,6 +163,7 @@ model PostGroup {
   arcId           String?       @map("arc_id")
   experimentId    String?       @map("experiment_id")
   skeleton        Boolean       @default(false) // двофазна генерація: скелет без текстів
+  intent          String?       // Ф3.6 educate | sell | trust | storytelling | entertainment
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
   project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -292,6 +293,20 @@ model EditLog {
 
   @@index([projectId])
   @@map("edit_logs")
+}
+
+// Ф3.6 SMM-стратегія: content pillars + intent-квоти (версійована)
+model SmmStrategy {
+  id                  String   @id @default(cuid())
+  projectId           String   @map("project_id")
+  contentPillars      Json     @default("[]") @map("content_pillars")
+  intentDistribution  Json     @default("{}") @map("intent_distribution") // {educate:0.30, sell:0.20, ...}
+  version             Int      @default(1)
+  activeFrom          DateTime @default(now()) @map("active_from")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@map("smm_strategies")
 }
 
 // Ф2.4 Ідемпотентність вебхуків генерації (unit_id, attempt)
