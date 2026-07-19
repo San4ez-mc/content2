@@ -145,6 +145,11 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   if (typeof funnelParams === "string") { try { funnelParams = JSON.parse(funnelParams); } catch { funnelParams = null; } }
   const needsGeneration = Boolean(funnelSlug && funnelSlug !== "text_only");
 
+  // #314: якщо палітру явно не задано — обираємо наступну по колу (ротація).
+  if (needsGeneration && !(funnelParams && typeof funnelParams === "object" && funnelParams.palette)) {
+    funnelParams = { ...(funnelParams || {}), palette: await pickRotatedPalette(projectId) };
+  }
+
   const group = await prisma.postGroup.create({
     data: {
       projectId,
@@ -446,6 +451,27 @@ async function markTopicsUsed(projectId: string, params: Record<string, unknown>
     marked += res.count;
   }
   return NextResponse.json({ ok: true, marked });
+}
+
+// #314 (В4) — ротація візуальних палітр із памʼяттю про попередні візуали.
+// Палітри є, але завжди бралася одна. Тут беремо останні використані у проєкті
+// й обираємо НАСТУПНУ по колу, щоб візуали не повторювались.
+const PALETTES = ["DARK_CINEMATIC", "MINIMAL_WHITE", "ENERGY_ORANGE", "TRUST_BLUE", "PREMIUM_PURPLE"];
+
+async function pickRotatedPalette(projectId: string): Promise<string> {
+  const recent = await prisma.postItem.findMany({
+    where: { group: { projectId } },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    select: { funnelParams: true },
+  }).catch(() => [] as { funnelParams: any }[]);
+  const used = recent
+    .map((r) => (r.funnelParams && typeof r.funnelParams === "object" ? (r.funnelParams as any).palette : null))
+    .filter((p): p is string => typeof p === "string" && PALETTES.includes(p));
+  const last = used[0];
+  if (!last) return PALETTES[0];
+  const idx = PALETTES.indexOf(last);
+  return PALETTES[(idx + 1) % PALETTES.length];
 }
 
 function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any, telegramChatId = "", telegramBotToken = "") {
