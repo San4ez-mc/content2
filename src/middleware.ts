@@ -6,6 +6,6 @@ export default withAuth({
 
 export const config = {
   matcher: [
-    "/((?!login|invite|api/auth|api/webhooks|api/posts/bulk-import|api/invite|api/sse|api/tools/for-bot|api/agent-tools|api/scheduler|api/generation-watchdog|_next/static|_next/image|favicon.ico|icon.svg).*)",
+    "/((?!login|forgot-password|reset-password|invite|api/auth|api/webhooks|api/posts/bulk-import|api/invite|api/sse|api/tools/for-bot|api/agent-tools|api/scheduler|api/generation-watchdog|_next/static|_next/image|favicon.ico|icon.svg).*)",
   ],
 };

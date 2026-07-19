@@ -295,6 +295,19 @@ model EditLog {
   @@map("edit_logs")
 }
 
+// Відновлення пароля (#237-аналог для content2; згодом переїде в SSO #284)
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
 // Ф3.6 SMM-стратегія: content pillars + intent-квоти (версійована)
 model SmmStrategy {
   id                  String   @id @default(cuid())
