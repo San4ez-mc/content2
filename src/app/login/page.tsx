@@ -90,6 +90,22 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Розділювач */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-xs text-fg-muted">або</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
+          {/* Вхід через FINEKO SSO (#284) */}
+          <button
+            type="button"
+            onClick={() => signIn("fineko-sso", { callbackUrl: "/" })}
+            className="btn-secondary w-full justify-center py-2.5"
+          >
+            Увійти через FINEKO
+          </button>
+
           <div className="text-center mt-4">
             <a href="/forgot-password" className="text-xs text-fg-muted hover:text-fg underline">
               Забули пароль?
