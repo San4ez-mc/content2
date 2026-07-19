@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { guardRecordProject } from "@/lib/tenant";
 import { unlink } from "fs/promises";
 import path from "path";
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const item = await prisma.mediaItem.findUnique({ where: { id: params.id } });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const denied = await guardRecordProject(item.projectId);
+  if (denied) return denied;
 
   // Delete file from disk
   try {
@@ -23,8 +21,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rec = await prisma.mediaItem.findUnique({ where: { id: params.id }, select: { projectId: true } });
+  const denied = await guardRecordProject(rec?.projectId);
+  if (denied) return denied;
 
   const body = await req.json();
   const { folder, tags } = body;

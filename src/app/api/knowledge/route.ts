@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = new URL(req.url);
   const projectId = searchParams.get("projectId");
   const category = searchParams.get("category");
   const activeOnly = searchParams.get("activeOnly") !== "false";
-
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const entries = await prisma.knowledgeEntry.findMany({
     where: {
-      projectId,
+      projectId: projectId!,
       ...(category ? { category } : {}),
       ...(activeOnly ? { isActive: true } : {}),
     },
@@ -27,14 +23,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await req.json();
   const { projectId, category = "general", title, content } = body;
-
-  if (!projectId || !title || !content) {
-    return NextResponse.json({ error: "projectId, title, content required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
+  if (!title || !content) {
+    return NextResponse.json({ error: "title, content required" }, { status: 400 });
   }
 
   const entry = await prisma.knowledgeEntry.create({

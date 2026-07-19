@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = req.nextUrl;
   const projectId = searchParams.get("projectId");
   const month = searchParams.get("month"); // YYYY-MM
   const search = (searchParams.get("search") || "").trim();
 
   if (!projectId) return NextResponse.json([]);
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const include = {
     items: { orderBy: { orderIndex: "asc" as const } },
@@ -57,11 +55,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await req.json();
   const { projectId, socialNetworkId, postDate, type, status, content, categoryId, personaId, scheduleTime } = body;
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const group = await prisma.postGroup.create({
     data: {

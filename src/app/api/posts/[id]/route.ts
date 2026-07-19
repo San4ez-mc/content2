@@ -1,27 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { guardRecordProject } from "@/lib/tenant";
 import { broadcastToProject } from "@/lib/sse";
 
 type Ctx = { params: { id: string } };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const group = await prisma.postGroup.findUnique({
     where: { id: params.id },
     include: { items: { orderBy: { orderIndex: "asc" } }, socialNetwork: true, category: true, persona: true },
   });
 
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const denied = await guardRecordProject(group.projectId);
+  if (denied) return denied;
+
   return NextResponse.json(group);
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const existing = await prisma.postGroup.findUnique({ where: { id: params.id }, select: { projectId: true } });
+  const denied = await guardRecordProject(existing?.projectId);
+  if (denied) return denied;
 
   const body = await req.json();
   const { status, audience, scheduleTime, categoryId, personaId, postDate, items } = body;
@@ -40,11 +40,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     include: { socialNetwork: true },
   });
 
-  // Update items if provided
+  // Update items if provided — scoped by groupId, щоб не можна було правити чужі айтеми за id
   if (items && Array.isArray(items)) {
     for (const item of items) {
-      await prisma.postItem.update({
-        where: { id: item.id },
+      await prisma.postItem.updateMany({
+        where: { id: item.id, groupId: params.id },
         data: {
           content: item.content,
           imagePrompt: item.imagePrompt,
@@ -63,11 +63,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const group = await prisma.postGroup.findUnique({ where: { id: params.id } });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const denied = await guardRecordProject(group.projectId);
+  if (denied) return denied;
 
   await prisma.postGroup.delete({ where: { id: params.id } });
 

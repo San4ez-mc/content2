@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { guardRecordProject } from "@/lib/tenant";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rec = await prisma.contentTopic.findUnique({ where: { id: params.id }, select: { projectId: true } });
+  const denied = await guardRecordProject(rec?.projectId);
+  if (denied) return denied;
 
   const body = await req.json();
   const { rubric, title, notes, platforms, status, isActive, sortOrder } = body;
@@ -26,9 +26,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true, topic });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const rec = await prisma.contentTopic.findUnique({ where: { id: params.id }, select: { projectId: true } });
+  const denied = await guardRecordProject(rec?.projectId);
+  if (denied) return denied;
 
   await prisma.contentTopic.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

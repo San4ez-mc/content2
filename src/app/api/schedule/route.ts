@@ -1,28 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const projectId = req.nextUrl.searchParams.get("projectId");
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const settings = await prisma.scheduleSettings.findUnique({
-    where: { projectId },
+    where: { projectId: projectId! },
   });
 
   return NextResponse.json(settings);
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await req.json();
   const { projectId, monday, tuesday, wednesday, thursday, friday, saturday, sunday, sendToTelegram, telegramChatId, digestTime, digestChatId } = body;
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const settings = await prisma.scheduleSettings.upsert({
     where: { projectId },

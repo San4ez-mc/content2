@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
 // Ф1.8 Журнал правок (local/global + категорія)
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = new URL(req.url);
   const projectId = searchParams.get("projectId");
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const edits = await prisma.editLog.findMany({
-    where: { projectId },
+    where: { projectId: projectId! },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
@@ -21,13 +18,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await req.json();
   const { projectId, scope = "local", category, unitId, text } = body;
-  if (!projectId || !text) {
-    return NextResponse.json({ error: "projectId, text required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
+  if (!text) {
+    return NextResponse.json({ error: "text required" }, { status: 400 });
   }
 
   const edit = await prisma.editLog.create({

@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { searchParams } = req.nextUrl;
-  const projectId = searchParams.get("projectId");
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  const projectId = req.nextUrl.searchParams.get("projectId");
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const topics = await prisma.contentTopic.findMany({
-    where: { projectId },
+    where: { projectId: projectId! },
     orderBy: [{ rubric: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
@@ -20,14 +16,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await req.json();
   const { projectId, rubric, title, notes, platforms, status } = body;
-
-  if (!projectId || !rubric || !title) {
-    return NextResponse.json({ error: "projectId, rubric, title required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
+  if (!rubric || !title) {
+    return NextResponse.json({ error: "rubric, title required" }, { status: 400 });
   }
 
   const topic = await prisma.contentTopic.create({

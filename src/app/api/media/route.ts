@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = req.nextUrl;
   const projectId = searchParams.get("projectId");
   const folder = searchParams.get("folder") || null;
   const tag = searchParams.get("tag") || null;
-
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const where: any = { projectId };
   if (folder) where.folder = folder;
@@ -28,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   // Get distinct folders
   const folders = await prisma.mediaItem.findMany({
-    where: { projectId, folder: { not: null } },
+    where: { projectId: projectId!, folder: { not: null } },
     select: { folder: true },
     distinct: ["folder"],
   });
@@ -37,9 +33,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const projectId = formData.get("projectId") as string;
@@ -47,7 +40,9 @@ export async function POST(req: NextRequest) {
   const tagsRaw = formData.get("tags") as string;
   const tags = tagsRaw ? JSON.parse(tagsRaw) : [];
 
-  if (!file || !projectId) return NextResponse.json({ error: "file and projectId required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
+  if (!file) return NextResponse.json({ error: "file required" }, { status: 400 });
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);

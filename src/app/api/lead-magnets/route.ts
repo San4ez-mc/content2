@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = req.nextUrl;
   const projectId = searchParams.get("projectId");
   const productId = searchParams.get("productId");
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
 
   const magnets = await prisma.leadMagnet.findMany({
-    where: { projectId, ...(productId ? { productId } : {}) },
+    where: { projectId: projectId!, ...(productId ? { productId } : {}) },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
@@ -21,14 +18,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const body = await req.json();
   const { projectId, productId, name, description, funnelSlug, botUsername, baseStartParam } = body;
-
-  if (!projectId || !productId || !name) {
-    return NextResponse.json({ error: "projectId, productId, name required" }, { status: 400 });
+  const gate = await requireProjectAccess(projectId);
+  if (isGateError(gate)) return gate.error;
+  if (!productId || !name) {
+    return NextResponse.json({ error: "productId, name required" }, { status: 400 });
   }
 
   // Ensure the product belongs to this project

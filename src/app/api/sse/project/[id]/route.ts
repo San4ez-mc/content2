@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionUser, canAccessProject } from "@/lib/tenant";
 import { addSSEClient, removeSSEClient } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +9,15 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
+  const user = await getSessionUser();
+  if (!user) {
     return new Response("Unauthorized", { status: 401 });
   }
 
   const projectId = params.id;
+  if (!(await canAccessProject(user, projectId))) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   const stream = new ReadableStream({
     start(ctrl) {
