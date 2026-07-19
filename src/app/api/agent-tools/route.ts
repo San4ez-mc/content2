@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
+import { rateLimit } from "@/lib/rateLimit";
+
+// Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
+const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -26,6 +30,19 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
   const action = String(params.action || "");
   const projectId = String(params.projectId || "");
   if (!projectId) return NextResponse.json({ ok: false, error: "projectId required" });
+
+  // Rate-limit: 120 будь-яких дій/хв на проєкт; дорогі генеративні — 20/хв.
+  const general = rateLimit(`at:${projectId}`, 120, 60_000);
+  if (!general.ok) {
+    return NextResponse.json({ ok: false, error: "Rate limit exceeded", retryAfterSec: general.retryAfterSec }, { status: 429 });
+  }
+  if (EXPENSIVE_ACTIONS.has(action)) {
+    const heavy = rateLimit(`at-heavy:${projectId}`, 20, 60_000);
+    if (!heavy.ok) {
+      return NextResponse.json({ ok: false, error: "Rate limit exceeded (generation)", retryAfterSec: heavy.retryAfterSec }, { status: 429 });
+    }
+  }
+
   const telegramChatId = String(params.telegramChatId || "");
   const telegramBotToken = String(params.telegramBotToken || "");
 
