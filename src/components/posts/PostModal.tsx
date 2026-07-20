@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn, STATUS_META } from "@/lib/utils";
 
+// #244 Теми (наміри) контенту — Ф3.6
+const INTENT_LABELS: Record<string, string> = {
+  educate: "Навчання",
+  sell: "Продаж",
+  trust: "Довіра",
+  storytelling: "Історія",
+  entertainment: "Розвага",
+};
+
 interface PostItem {
   id: string;
   orderIndex: number;
@@ -28,6 +37,7 @@ interface PostGroup {
   scheduleTime: string | null;
   categoryId: string | null;
   personaId: string | null;
+  intent?: string | null;
   socialNetwork: { id: string; name: string; platformKey: string; color?: string | null };
   category?: { id: string; name: string; color: string | null } | null;
   persona?: { id: string; name: string } | null;
@@ -254,8 +264,21 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                       backgroundColor: (group.category.color || "#64748b") + "22",
                       color: group.category.color || "#64748b"
                     }}
+                    title="Категорія, обрана при створенні"
                   >
                     {group.category.name}
+                  </span>
+                </>
+              )}
+              {/* #244 Тема (намір) створення */}
+              {group.intent && INTENT_LABELS[group.intent] && (
+                <>
+                  <span className="text-xs text-fg-subtle">·</span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-canvas-subtle text-fg-muted border border-border"
+                    title="Тема (намір) контенту при створенні"
+                  >
+                    🎯 {INTENT_LABELS[group.intent]}
                   </span>
                 </>
               )}
