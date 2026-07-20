@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn, STATUS_META } from "@/lib/utils";
+import { PostConstructor } from "./PostConstructor";
 
 // #244 Теми (наміри) контенту — Ф3.6
 const INTENT_LABELS: Record<string, string> = {
@@ -38,6 +39,12 @@ interface PostGroup {
   categoryId: string | null;
   personaId: string | null;
   intent?: string | null;
+  structureId?: string | null;
+  evidenceType?: string | null;
+  hookA?: string | null;
+  hookB?: string | null;
+  hookSelected?: string | null;
+  cta?: string | null;
   socialNetwork: { id: string; name: string; platformKey: string; color?: string | null };
   category?: { id: string; name: string; color: string | null } | null;
   persona?: { id: string; name: string } | null;
@@ -649,6 +656,19 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                   Категорій та персонажів ще немає.{" "}
                   <a href="/categories" className="text-accent hover:underline">Створіть їх →</a>
                 </div>
+              )}
+
+              {/* #248 Конструктор поста + бали ефективності елементів */}
+              {pid && (
+                <PostConstructor
+                  postId={group.id}
+                  projectId={pid}
+                  group={{
+                    intent: group.intent, structureId: group.structureId, evidenceType: group.evidenceType,
+                    hookA: group.hookA, hookB: group.hookB, hookSelected: group.hookSelected, cta: group.cta,
+                  }}
+                  onSaved={onUpdate}
+                />
               )}
             </div>
           )}

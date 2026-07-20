@@ -24,7 +24,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (denied) return denied;
 
   const body = await req.json();
-  const { status, audience, scheduleTime, categoryId, personaId, postDate, items } = body;
+  const { status, audience, scheduleTime, categoryId, personaId, postDate, items,
+    intent, structureId, evidenceType, hookA, hookB, hookSelected, cta } = body; // #248 конструктор
 
   // Update group fields
   const group = await prisma.postGroup.update({
@@ -36,6 +37,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       ...(categoryId !== undefined && { categoryId }),
       ...(personaId !== undefined && { personaId }),
       ...(postDate !== undefined && { postDate: new Date(postDate) }),
+      // #248 атоми конструктора
+      ...(intent !== undefined && { intent: intent || null }),
+      ...(structureId !== undefined && { structureId: structureId || null }),
+      ...(evidenceType !== undefined && { evidenceType: evidenceType || null }),
+      ...(hookA !== undefined && { hookA: hookA || null }),
+      ...(hookB !== undefined && { hookB: hookB || null }),
+      ...(hookSelected !== undefined && { hookSelected: hookSelected || null }),
+      ...(cta !== undefined && { cta: cta || null }),
     },
     include: { socialNetwork: true },
   });
