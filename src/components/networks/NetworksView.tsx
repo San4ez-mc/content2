@@ -148,14 +148,14 @@ function NetworksList({ networks, projectId, onRefresh }: { networks: SocialNetw
   }
 
   return (
-    <div className="max-w-2xl space-y-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
       {networks.map((n) => {
         const preset = PLATFORM_PRESETS.find((p) => p.platformKey === n.platformKey);
         return (
           <div
             key={n.id}
             className={cn(
-              "flex items-center gap-4 p-4 bg-canvas-subtle border rounded-xl transition-colors",
+              "flex flex-col gap-3 p-4 bg-canvas-subtle border rounded-xl transition-colors",
               n.isEnabled ? "border-border" : "border-border/40 opacity-60"
             )}
           >
