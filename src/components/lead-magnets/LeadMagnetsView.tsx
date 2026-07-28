@@ -93,7 +93,7 @@ export function LeadMagnetsView({ projectId }: Props) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 max-w-4xl">
+      <div className="flex-1 overflow-auto p-4">
         {noProducts ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="text-5xl mb-3">🧲</div>

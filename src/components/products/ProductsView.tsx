@@ -68,7 +68,7 @@ export function ProductsView({ projectId }: Props) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 max-w-4xl">
+      <div className="flex-1 overflow-auto p-4">
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 skeleton rounded-xl" />)}
