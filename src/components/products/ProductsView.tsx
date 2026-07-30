@@ -63,9 +63,14 @@ export function ProductsView({ projectId }: Props) {
           <p className="text-sm font-semibold text-fg">Продукти</p>
           <p className="text-xs text-fg-muted">Що ми продаємо — контент-план орієнтується на ці продукти</p>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-primary text-xs px-3 py-1">
-          + Новий продукт
-        </button>
+        <div className="flex items-center gap-2">
+          <a href={`/api/brand-doc?projectId=${projectId}`} className="text-xs px-3 py-1 rounded border border-border text-fg-muted hover:text-fg hover:bg-canvas-subtle transition-colors" title="Завантажити бренд-профіль (продукти, персони, тон, стратегія) у .docx">
+            ⬇ Бренд-профіль .docx
+          </a>
+          <button onClick={() => setCreating(true)} className="btn-primary text-xs px-3 py-1">
+            + Новий продукт
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
