@@ -136,6 +136,9 @@ model Persona {
   goals          String?     @db.Text
   tone           String?
   forbiddenWords String?     @map("forbidden_words") @db.Text
+  triggers       String?     @db.Text // що штовхає до покупки
+  objections     String?     @db.Text // заперечення/сумніви
+  language       String?     @db.Text // як говорить (лексика, приклади фраз)
   project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   postGroups     PostGroup[]
   createdAt      DateTime    @default(now()) @map("created_at")
@@ -505,6 +508,10 @@ model Product {
   description String?      @db.Text // що це, кому, ключова цінність — щоб контент вів до продажу
   price       String?      // вільний текст: "2500 грн", "від $500", "за запитом"
   audience    String?      @db.Text // для кого продукт (ЦА)
+  pains       String?      @db.Text // болі, які закриває (ШІ пропонує за методологією)
+  transformation String?   @db.Text // до/після — трансформація клієнта
+  benefits    String?      @db.Text // ключові переваги
+  priority    Int?         // пріоритет продукту (1 = головний)
   isActive    Boolean      @default(true) @map("is_active")
   sortOrder   Int          @default(0) @map("sort_order")
   createdAt   DateTime     @default(now()) @map("created_at")

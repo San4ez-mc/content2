@@ -56,12 +56,12 @@ export async function syncStaticToVector(
     chunks.push({ source: `brand:${b.id}`, content: `${b.title}\n${b.content}`, metadata: { kind: "brand", id: b.id, category: b.category } });
   }
   for (const p of personas) {
-    const content = [`Персона: ${p.name}`, p.pains && `Болі: ${p.pains}`, p.goals && `Цілі: ${p.goals}`, p.tone && `Тон: ${p.tone}`, p.forbiddenWords && `Уникати: ${p.forbiddenWords}`].filter(Boolean).join("\n");
+    const content = [`Персона: ${p.name}`, p.pains && `Болі: ${p.pains}`, p.goals && `Цілі: ${p.goals}`, (p as any).triggers && `Тригери: ${(p as any).triggers}`, (p as any).objections && `Заперечення: ${(p as any).objections}`, (p as any).language && `Мова: ${(p as any).language}`, p.tone && `Тон: ${p.tone}`, p.forbiddenWords && `Уникати: ${p.forbiddenWords}`].filter(Boolean).join("\n");
     chunks.push({ source: `persona:${p.id}`, content, metadata: { kind: "persona", id: p.id } });
   }
   for (const p of products) {
     const lm = (p as any).leadMagnets?.map((m: any) => m.name).join(", ");
-    const content = [`Продукт: ${p.name}`, p.price && `Ціна: ${p.price}`, p.description && `Опис: ${p.description}`, p.audience && `ЦА: ${p.audience}`, lm && `Лід-магніти: ${lm}`].filter(Boolean).join("\n");
+    const content = [`Продукт: ${p.name}`, p.price && `Ціна: ${p.price}`, p.description && `Опис: ${p.description}`, (p as any).pains && `Болі: ${(p as any).pains}`, (p as any).transformation && `Трансформація: ${(p as any).transformation}`, (p as any).benefits && `Переваги: ${(p as any).benefits}`, p.audience && `ЦА: ${p.audience}`, lm && `Лід-магніти: ${lm}`].filter(Boolean).join("\n");
     chunks.push({ source: `product:${p.id}`, content, metadata: { kind: "product", id: p.id } });
   }
   for (const c of cases) {

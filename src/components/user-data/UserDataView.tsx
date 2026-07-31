@@ -6,8 +6,8 @@ interface Data {
   projectId: string;
   projectName: string;
   brand: { id: string; category: string; title: string; content: string; updatedAt: string }[];
-  personas: { id: string; name: string; age: number | null; gender: string | null; type: string | null; pains: string | null; goals: string | null; tone: string | null; forbiddenWords: string | null }[];
-  products: { id: string; name: string; description: string | null; price: string | null; audience: string | null; leadMagnets: { id: string; name: string }[] }[];
+  personas: { id: string; name: string; age: number | null; gender: string | null; type: string | null; pains: string | null; goals: string | null; tone: string | null; forbiddenWords: string | null; triggers: string | null; objections: string | null; language: string | null }[];
+  products: { id: string; name: string; description: string | null; price: string | null; audience: string | null; pains: string | null; transformation: string | null; benefits: string | null; priority: number | null; leadMagnets: { id: string; name: string }[] }[];
   cases: { id: string; title: string; niche: string | null; problem: string | null; solution: string | null; metrics: Record<string, any> | null; allowedClaims: string | null }[];
   strategy: { version: number; contentPillars: any; intentDistribution: any } | null;
   topicsCount: number;
@@ -138,6 +138,9 @@ export function UserDataView({ data }: { data: Data }) {
               <Row label="Уникати" value={p.forbiddenWords} />
               <Row label="Болі" value={p.pains} />
               <Row label="Цілі/мрії" value={p.goals} />
+              <Row label="Тригери" value={p.triggers} />
+              <Row label="Заперечення" value={p.objections} />
+              <Row label="Мова" value={p.language} />
             </Card>
           ))}
         </Section>
@@ -145,8 +148,11 @@ export function UserDataView({ data }: { data: Data }) {
         {/* Продукти */}
         <Section title="Продукти" count={data.products.length} section="product" projectId={projectId} empty="Ще немає продуктів.">
           {data.products.map((p) => (
-            <Card key={p.id} title={p.name} subtitle={p.price || undefined}>
+            <Card key={p.id} title={p.name} subtitle={[p.price, p.priority ? `пріоритет ${p.priority}` : null].filter(Boolean).join(" · ") || undefined}>
               <Row label="Опис" value={p.description} />
+              <Row label="Болі, які закриває" value={p.pains} />
+              <Row label="Трансформація" value={p.transformation} />
+              <Row label="Переваги" value={p.benefits} />
               <Row label="ЦА" value={p.audience} />
               <Row label="Лід-магніти" value={p.leadMagnets.map((m) => m.name).join(", ") || null} />
             </Card>

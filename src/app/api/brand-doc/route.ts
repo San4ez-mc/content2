@@ -39,6 +39,9 @@ export async function GET(req: NextRequest) {
       if (p.price) children.push(P(`Ціна: ${p.price}`));
       if (p.audience) children.push(P(`Цільова аудиторія: ${p.audience}`));
       if (p.description) children.push(P(p.description));
+      if (p.pains) children.push(P(`Болі, які закриває: ${p.pains}`));
+      if (p.transformation) children.push(P(`Трансформація: ${p.transformation}`));
+      if (p.benefits) children.push(P(`Переваги: ${p.benefits}`));
       if (p.leadMagnets?.length) children.push(P(`Лід-магніти: ${p.leadMagnets.map((m: any) => m.name).join(", ")}`));
     } else children.push(P("—"));
   }
@@ -52,6 +55,9 @@ export async function GET(req: NextRequest) {
       if (p.forbiddenWords) children.push(P(`Уникати: ${p.forbiddenWords}`));
       if (p.pains) children.push(P(`Болі: ${p.pains}`));
       if (p.goals) children.push(P(`Цілі/мрії: ${p.goals}`));
+      if (p.triggers) children.push(P(`Тригери: ${p.triggers}`));
+      if (p.objections) children.push(P(`Заперечення: ${p.objections}`));
+      if (p.language) children.push(P(`Мова: ${p.language}`));
     } else children.push(P("—"));
   }
 

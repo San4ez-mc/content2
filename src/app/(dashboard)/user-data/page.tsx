@@ -43,8 +43,8 @@ export default async function UserDataPage({ searchParams }: { searchParams: { p
     projectId,
     projectName: project?.name || "",
     brand: brand.map((b) => ({ id: b.id, category: b.category, title: b.title, content: b.content, updatedAt: b.updatedAt.toISOString() })),
-    personas: personas.map((p) => ({ id: p.id, name: p.name, age: p.age, gender: p.gender, type: p.type, pains: p.pains, goals: p.goals, tone: p.tone, forbiddenWords: p.forbiddenWords })),
-    products: products.map((p) => ({ id: p.id, name: p.name, description: p.description, price: p.price, audience: p.audience, leadMagnets: p.leadMagnets.map((m) => ({ id: m.id, name: m.name })) })),
+    personas: personas.map((p) => ({ id: p.id, name: p.name, age: p.age, gender: p.gender, type: p.type, pains: p.pains, goals: p.goals, tone: p.tone, forbiddenWords: p.forbiddenWords, triggers: p.triggers, objections: p.objections, language: p.language })),
+    products: products.map((p) => ({ id: p.id, name: p.name, description: p.description, price: p.price, audience: p.audience, pains: p.pains, transformation: p.transformation, benefits: p.benefits, priority: p.priority, leadMagnets: p.leadMagnets.map((m) => ({ id: m.id, name: m.name })) })),
     cases: cases.map((c) => ({ id: c.id, title: c.title, niche: c.niche, problem: c.problem, solution: c.solution, metrics: c.metrics as any, allowedClaims: c.allowedClaims })),
     strategy: strategy
       ? { version: strategy.version, contentPillars: strategy.contentPillars as any, intentDistribution: strategy.intentDistribution as any }
