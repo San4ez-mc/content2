@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncStaticToVector } from "@/lib/vector-sync";
 
 // Викликається онбординг-воронками flows (Агент A). Find-or-create проект за назвою
 // компанії + збереження артефакту (продукт / персона / стратегія / бренд-ToV).
@@ -62,6 +63,9 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
+
+  // Ре-синк Client Static у вектор (fire-and-forget — не блокуємо воронку).
+  syncStaticToVector(projectId).catch(() => {});
 
   return NextResponse.json({ ok: true, projectId, kind, id: saved?.id });
 }

@@ -73,6 +73,23 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
 
 export function UserDataView({ data }: { data: Data }) {
   const { projectId } = data;
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function syncVector() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const r = await fetch(`/api/vector/sync?projectId=${projectId}`, { method: "POST" });
+      const j = await r.json();
+      if (j.ok) setSyncMsg({ ok: true, text: `✅ Проіндексовано ${j.ingested} записів у базу знань` });
+      else setSyncMsg({ ok: false, text: j.reason || "Помилка синхронізації" });
+    } catch (e: any) {
+      setSyncMsg({ ok: false, text: e.message || "Помилка" });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-40px)]">
@@ -81,13 +98,26 @@ export function UserDataView({ data }: { data: Data }) {
           <p className="text-sm font-semibold text-fg">Дані користувача — {data.projectName}</p>
           <p className="text-xs text-fg-muted">Уся база бренду: бренд-профіль, персони, продукти, кейси, стратегія. Переглянути й скачати.</p>
         </div>
-        <a
-          href={`/api/brand-doc?projectId=${projectId}&section=all`}
-          className="btn-primary text-xs px-3 py-1"
-          title="Завантажити весь бренд-профіль у .docx"
-        >
-          ⬇ Завантажити все .docx
-        </a>
+        <div className="flex items-center gap-2">
+          {syncMsg && (
+            <span className={`text-[11px] ${syncMsg.ok ? "text-success" : "text-danger"}`}>{syncMsg.text}</span>
+          )}
+          <button
+            onClick={syncVector}
+            disabled={syncing}
+            className="text-xs px-3 py-1 rounded border border-border text-fg-muted hover:text-fg hover:bg-canvas transition-colors disabled:opacity-50"
+            title="Проіндексувати всі дані у векторну базу знань (Client Static)"
+          >
+            {syncing ? "Синхронізація…" : "🔄 У базу знань"}
+          </button>
+          <a
+            href={`/api/brand-doc?projectId=${projectId}&section=all`}
+            className="btn-primary text-xs px-3 py-1"
+            title="Завантажити весь бренд-профіль у .docx"
+          >
+            ⬇ Завантажити все .docx
+          </a>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">

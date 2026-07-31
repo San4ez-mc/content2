@@ -34,6 +34,10 @@ model Project {
   id               String            @id @default(cuid())
   name             String
   isActive         Boolean           @default(true) @map("is_active")
+  // Вектор-мікросервіс (3 індекси: global спільний + static/dynamic на компанію)
+  vectorProjectId  String?           @map("vector_project_id")
+  vectorToken      String?           @map("vector_token")
+  vectorSyncedAt   DateTime?         @map("vector_synced_at")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   projectUsers     ProjectUser[]
