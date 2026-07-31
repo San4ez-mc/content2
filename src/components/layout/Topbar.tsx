@@ -87,6 +87,13 @@ export function Topbar({ user }: Props) {
                 <p className="text-xs font-medium text-fg truncate">{user.name}</p>
                 <p className="text-xs text-fg-subtle truncate">{user.email}</p>
               </div>
+              <Link
+                href="/user-data"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-fg-muted hover:text-fg hover:bg-border/30 transition-colors"
+                onClick={() => setDropdownOpen(false)}
+              >
+                📄 Дані користувача
+              </Link>
               {user.role === "superadmin" && (
                 <Link
                   href="/admin"
