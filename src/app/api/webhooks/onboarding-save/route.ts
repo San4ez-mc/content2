@@ -95,6 +95,15 @@ export async function POST(req: NextRequest) {
       saved = latest
         ? await prisma.smmStrategy.update({ where: { id: latest.id }, data: fields })
         : await prisma.smmStrategy.create({ data: { projectId: pid, ...fields } });
+    } else if (kind === "doc") {
+      // Витягнутий текст завантаженого документа → KnowledgeEntry (піде у вектор Static).
+      const title = String(data.fileName || data.title || "Документ").slice(0, 200);
+      const content = String(data.text || data.content || "").trim();
+      if (!content) return NextResponse.json({ error: "doc: порожній текст" }, { status: 400 });
+      const existing = await prisma.knowledgeEntry.findFirst({ where: { projectId: pid, category: "onboarding-doc", title: { equals: title, mode: "insensitive" } } });
+      saved = existing
+        ? await prisma.knowledgeEntry.update({ where: { id: existing.id }, data: { content, isActive: true } })
+        : await prisma.knowledgeEntry.create({ data: { projectId: pid, category: "onboarding-doc", title, content, addedBy: "bot" } });
     } else if (kind === "brand") {
       const title = String(data.title || "Бренд і Tone of Voice");
       const content = String(data.content || "");
