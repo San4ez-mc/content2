@@ -226,16 +226,19 @@ model PostItem {
 model Case {
   id            String   @id @default(cuid())
   projectId     String   @map("project_id")
+  productId     String?  @map("product_id") // кейс демонструє конкретний продукт
   title         String
   niche         String?
   problem       String?  @db.Text
   solution      String?  @db.Text
   metrics       Json     @default("{}") // цифри-результати
   allowedClaims String?  @map("allowed_claims") @db.Text // дозволені формулювання
+  product       Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@index([projectId])
+  @@index([productId])
   @@map("cases")
 }
 
@@ -518,6 +521,7 @@ model Product {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   leadMagnets LeadMagnet[]
+  cases       Case[]
 
   @@index([projectId, isActive])
   @@map("products")

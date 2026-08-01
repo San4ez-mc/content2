@@ -58,15 +58,36 @@ export async function POST(req: NextRequest) {
         ? await prisma.persona.update({ where: { id: existing.id }, data: fields })
         : await prisma.persona.create({ data: { projectId: pid, name: String(data.name || "Персона"), ...fields } });
     } else if (kind === "case") {
+      // Прив'язка кейса до продукту за назвою (data.product | productName)
+      const prodName = data.product || data.productName;
+      const prod = prodName ? await findByName(prisma.product, "name", String(prodName)) : null;
       const fields = {
         niche: data.niche ?? undefined, problem: data.problem ?? undefined, solution: data.solution ?? undefined,
         metrics: data.metrics && typeof data.metrics === "object" ? data.metrics : undefined,
         allowedClaims: data.allowedClaims ?? undefined,
+        ...(prod ? { productId: prod.id } : {}),
       };
       const existing = await findByName(prisma.case, "title", String(data.title || "Кейс"));
       saved = existing
         ? await prisma.case.update({ where: { id: existing.id }, data: fields })
         : await prisma.case.create({ data: { projectId: pid, title: String(data.title || "Кейс"), ...fields } });
+    } else if (kind === "products") {
+      // Масив продуктів (етап «продукти на початку»). Append+дедуп за назвою.
+      const items: any[] = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
+      let n = 0;
+      for (const p of items) {
+        if (!p?.name) continue;
+        const fields = {
+          description: p.description ?? undefined, price: p.price ?? undefined, audience: p.audience ?? undefined,
+          pains: p.pains ?? undefined, transformation: p.transformation ?? undefined, benefits: p.benefits ?? undefined,
+          priority: Number.isFinite(Number(p.priority)) ? Number(p.priority) : undefined,
+        };
+        const ex = await findByName(prisma.product, "name", String(p.name));
+        if (ex) await prisma.product.update({ where: { id: ex.id }, data: fields });
+        else await prisma.product.create({ data: { projectId: pid, name: String(p.name), ...fields } });
+        n++;
+      }
+      saved = { created: n };
     } else if (kind === "leadmagnet") {
       // Лід-магніт прив'язується до продукту (за назвою або до першого).
       let productRec = data.productName ? await findByName(prisma.product, "name", String(data.productName)) : null;
