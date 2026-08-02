@@ -66,7 +66,14 @@ ${combined}`;
     return NextResponse.json({ ok: false, error: "не вдалось розпарсити JSON від LLM", raw: text.slice(0, 300) }, { status: 500 });
   }
 
-  const findByName = (m: any, f: string, v: string) => m.findFirst({ where: { projectId, [f]: { equals: v, mode: "insensitive" } } });
+  const normName = (s: any) => String(s || "").toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const findByName = async (m: any, f: string, v: string) => {
+    const target = normName(v);
+    if (!target) return null;
+    const rows = await m.findMany({ where: { projectId }, select: { id: true, [f]: true } });
+    const hit = rows.find((r: any) => normName(r[f]) === target);
+    return hit ? { id: hit.id } : null;
+  };
   const productMap = new Map<string, string>(); // name(lower) → productId
   let pc = 0, prc = 0, cc = 0;
 

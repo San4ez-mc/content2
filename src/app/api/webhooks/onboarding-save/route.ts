@@ -29,9 +29,17 @@ export async function POST(req: NextRequest) {
   }
   const pid = project.id;
 
-  // insensitive-пошук існуючого за полем (для append+дедуп)
-  const findByName = (model: any, field: string, value: string) =>
-    model.findFirst({ where: { projectId: pid, [field]: { equals: value, mode: "insensitive" } } });
+  // Нормалізація назви для fuzzy-дедупу: нижній регістр, стиснуті пробіли,
+  // прибрані хвостові дужки «(...)» — щоб «Розбір процесу» і «Розбір процесу (консультація)»
+  // рахувались одним. Ловить варіанти назв, не лише точний збіг.
+  const normName = (s: any) => String(s || "").toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const findByName = async (model: any, field: string, value: string) => {
+    const target = normName(value);
+    if (!target) return null;
+    const rows = await model.findMany({ where: { projectId: pid }, select: { id: true, [field]: true } });
+    const hit = rows.find((r: any) => normName(r[field]) === target);
+    return hit ? { id: hit.id } : null;
+  };
 
   let saved: any = null;
   try {

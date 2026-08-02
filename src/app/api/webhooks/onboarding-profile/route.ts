@@ -51,8 +51,18 @@ export async function POST(req: NextRequest) {
   if (!leadMagnets) gaps.push("leadmagnet");
   if (!brand) gaps.push("brand");
 
+  // Прогрес заповнення профілю (%) — зважений по секціях
+  let progress = 0;
+  if (products.length) progress += 20;
+  if (personas.length) progress += 20;
+  if (brand) progress += 15;
+  if (strategy) progress += 20;
+  if (cases) progress += 15;
+  if (topicsCount >= 20) progress += 10;
+
   // Компактний текст для інжекту в промпт бота
   const summary = [
+    `Профіль заповнено на ${progress}%.`,
     `Компанія: ${project.name}.`,
     products.length ? `Продукти: ${products.map((p) => p.name).join(", ")}.` : "Продуктів ще нема.",
     personas.length ? `Персони: ${personas.map((p) => p.name).join(", ")}.` : "Персон ще нема.",
@@ -60,5 +70,5 @@ export async function POST(req: NextRequest) {
     `Стратегія: ${strategy ? "є" : "нема"}. Бренд/ToV: ${brand ? "є" : "нема"}.`,
   ].join(" ");
 
-  return NextResponse.json({ ok: true, exists: true, projectId: pid, projectName: project.name, known, gaps, summary });
+  return NextResponse.json({ ok: true, exists: true, projectId: pid, projectName: project.name, progress, known, gaps, summary });
 }
