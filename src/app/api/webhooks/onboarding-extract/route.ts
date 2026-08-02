@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
-  const projectId = body.projectId as string | undefined;
+  const projectId = (body.projectId || req.nextUrl.searchParams.get("projectId")) as string | undefined;
   if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
 
   const docs = await prisma.knowledgeEntry.findMany({

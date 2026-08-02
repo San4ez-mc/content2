@@ -13,9 +13,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { projectId, projectName, kind, data } = body as {
+  const { projectName, kind, data } = body as {
     projectId?: string; projectName?: string; kind?: string; data?: any;
   };
+  const projectId = (body as any).projectId || req.nextUrl.searchParams.get("projectId") || undefined;
   if (!kind || !data) {
     return NextResponse.json({ error: "kind, data required" }, { status: 400 });
   }

@@ -11,7 +11,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { projectId, projectName } = body as { projectId?: string; projectName?: string };
+  const { projectName } = body as { projectName?: string };
+  const projectId = (body as any).projectId || req.nextUrl.searchParams.get("projectId") || undefined;
 
   let project = projectId ? await prisma.project.findUnique({ where: { id: projectId } }) : null;
   if (!project && projectName) project = await prisma.project.findFirst({ where: { name: projectName } });
