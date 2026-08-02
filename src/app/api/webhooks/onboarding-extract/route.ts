@@ -26,15 +26,21 @@ export async function POST(req: NextRequest) {
   if (!docs.length) return NextResponse.json({ ok: true, note: "немає документів", products: 0, personas: 0, cases: 0 });
 
   // Наявні продукти — щоб парсер прив'язував кожен кейс до потрібного продукту.
-  const existingProducts = await prisma.product.findMany({ where: { projectId }, select: { name: true } });
+  const [existingProducts, existingPersonas] = await Promise.all([
+    prisma.product.findMany({ where: { projectId }, select: { name: true } }),
+    prisma.persona.findMany({ where: { projectId }, select: { name: true } }),
+  ]);
   const productList = existingProducts.map((p) => p.name).join(", ") || "(ще немає)";
+  const personaList = existingPersonas.map((p) => p.name).join(", ") || "(ще немає)";
 
   const combined = docs.map((d) => `# ${d.title}\n${d.content}`).join("\n\n---\n\n").slice(0, 40000);
   const prompt = `Ти — парсер онбордингу. З документів витягни СТРУКТУРОВАНІ дані компанії. Поверни РІВНО валідний JSON без тексту навколо:
 {"products":[{"name":"","description":"","pains":"","transformation":"","benefits":"","price":"","audience":"","priority":1}],
 "personas":[{"name":"","pains":"","goals":"","triggers":"","objections":"","language":"","tone":"","forbiddenWords":""}],
 "cases":[{"title":"","product":"назва продукту, який демонструє кейс","niche":"","problem":"","solution":"","metrics":{"ключ":"значення"},"allowedClaims":""}]}
-Витягни ВСІ продукти, персони і кейси з документів. У КОЖНОГО кейса заповни "product" — назву продукту, який він демонструє (обери з наявних: ${productList}; якщо це новий продукт — з масиву products). Чого немає — порожній масив. Не вигадуй фактів. Українською.
+Витягни продукти, персони і кейси з документів.
+ВАЖЛИВО (дедуп): наявні ПРОДУКТИ: ${productList}. Наявні ПЕРСОНИ: ${personaList}. Якщо продукт/персона з документа — це ТОЙ САМИЙ, що вже є (навіть якщо названо трохи інакше) — ВИКОРИСТАЙ ТОЧНО наявну назву, НЕ створюй варіант. Додавай у масив лише СПРАВДІ нові або уточнення наявних.
+У КОЖНОГО кейса заповни "product" — назву продукту, який він демонструє (з наявних ${productList} або з масиву products). Чого немає — порожній масив. Не вигадуй фактів. Українською.
 
 ДОКУМЕНТИ:
 ${combined}`;
@@ -91,6 +97,13 @@ ${combined}`;
     ex ? await prisma.case.update({ where: { id: ex.id }, data: f }) : await prisma.case.create({ data: { projectId, title: String(c.title), ...f } });
     cc++;
   }
+
+  // Позначити оброблені документи, щоб парсер не перечитував їх наступного разу
+  // (інакше кожен «далі» повторно плодить персони/продукти). Текст лишається у вектор Static.
+  await prisma.knowledgeEntry.updateMany({
+    where: { id: { in: docs.map((d) => d.id) } },
+    data: { category: "onboarding-doc-done" },
+  });
 
   syncStaticToVector(projectId).catch(() => {});
   return NextResponse.json({ ok: true, products: pc, personas: prc, cases: cc });
