@@ -33,6 +33,13 @@ export async function POST(req: NextRequest) {
   // Нормалізація назви для fuzzy-дедупу: нижній регістр, стиснуті пробіли,
   // прибрані хвостові дужки «(...)» — щоб «Розбір процесу» і «Розбір процесу (консультація)»
   // рахувались одним. Ловить варіанти назв, не лише точний збіг.
+  // Коерсія текстових полів: LLM іноді шле масив/обʼєкт замість рядка (болі списком) —
+  // Prisma чекає String і падає 500. Масив → «; »-рядок, обʼєкт → JSON, інше → String.
+  const S = (v: any): string | undefined =>
+    v == null ? undefined
+    : Array.isArray(v) ? (v.filter((x) => x != null && x !== "").map(String).join("; ") || undefined)
+    : typeof v === "object" ? JSON.stringify(v)
+    : String(v);
   const normName = (s: any) => String(s || "").toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
   const findByName = async (model: any, field: string, value: string) => {
     const target = normName(value);
@@ -46,9 +53,9 @@ export async function POST(req: NextRequest) {
   try {
     if (kind === "product") {
       const fields = {
-        description: data.description ?? undefined, price: data.price ?? undefined, audience: data.audience ?? undefined,
-        pains: data.pains ?? undefined, transformation: data.transformation ?? undefined,
-        benefits: data.benefits ?? undefined, priority: Number.isFinite(Number(data.priority)) ? Number(data.priority) : undefined,
+        description: S(data.description), price: S(data.price), audience: S(data.audience),
+        pains: S(data.pains), transformation: S(data.transformation),
+        benefits: S(data.benefits), priority: Number.isFinite(Number(data.priority)) ? Number(data.priority) : undefined,
       };
       const existing = await findByName(prisma.product, "name", String(data.name || "Продукт"));
       saved = existing
@@ -57,10 +64,10 @@ export async function POST(req: NextRequest) {
     } else if (kind === "persona") {
       const fields = {
         age: Number.isFinite(Number(data.age)) ? Number(data.age) : undefined,
-        gender: data.gender ?? undefined, type: data.type ?? undefined,
-        pains: data.pains ?? undefined, goals: data.goals ?? undefined, tone: data.tone ?? undefined,
-        forbiddenWords: data.forbiddenWords ?? undefined, triggers: data.triggers ?? undefined,
-        objections: data.objections ?? undefined, language: data.language ?? undefined,
+        gender: S(data.gender), type: S(data.type),
+        pains: S(data.pains), goals: S(data.goals), tone: S(data.tone),
+        forbiddenWords: S(data.forbiddenWords), triggers: S(data.triggers),
+        objections: S(data.objections), language: S(data.language),
       };
       const existing = await findByName(prisma.persona, "name", String(data.name || "Персона"));
       saved = existing
@@ -71,9 +78,9 @@ export async function POST(req: NextRequest) {
       const prodName = data.product || data.productName;
       const prod = prodName ? await findByName(prisma.product, "name", String(prodName)) : null;
       const fields = {
-        niche: data.niche ?? undefined, problem: data.problem ?? undefined, solution: data.solution ?? undefined,
+        niche: S(data.niche), problem: S(data.problem), solution: S(data.solution),
         metrics: data.metrics && typeof data.metrics === "object" ? data.metrics : undefined,
-        allowedClaims: data.allowedClaims ?? undefined,
+        allowedClaims: S(data.allowedClaims),
         ...(prod ? { productId: prod.id } : {}),
       };
       const existing = await findByName(prisma.case, "title", String(data.title || "Кейс"));
@@ -87,8 +94,8 @@ export async function POST(req: NextRequest) {
       for (const p of items) {
         if (!p?.name) continue;
         const fields = {
-          description: p.description ?? undefined, price: p.price ?? undefined, audience: p.audience ?? undefined,
-          pains: p.pains ?? undefined, transformation: p.transformation ?? undefined, benefits: p.benefits ?? undefined,
+          description: S(p.description), price: S(p.price), audience: S(p.audience),
+          pains: S(p.pains), transformation: S(p.transformation), benefits: S(p.benefits),
           priority: Number.isFinite(Number(p.priority)) ? Number(p.priority) : undefined,
         };
         const ex = await findByName(prisma.product, "name", String(p.name));
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
       if (!productRec) productRec = await prisma.product.findFirst({ where: { projectId: pid }, orderBy: { sortOrder: "asc" } });
       if (!productRec) return NextResponse.json({ error: "leadmagnet: немає продукту для прив'язки" }, { status: 400 });
       const existing = await prisma.leadMagnet.findFirst({ where: { projectId: pid, productId: productRec.id, name: { equals: String(data.name || "Лід-магніт"), mode: "insensitive" } } });
-      const fields = { description: data.description ?? undefined, funnelSlug: data.funnelSlug ?? undefined };
+      const fields = { description: S(data.description), funnelSlug: S(data.funnelSlug) };
       saved = existing
         ? await prisma.leadMagnet.update({ where: { id: existing.id }, data: fields })
         : await prisma.leadMagnet.create({ data: { projectId: pid, productId: productRec.id, name: String(data.name || "Лід-магніт"), ...fields } });

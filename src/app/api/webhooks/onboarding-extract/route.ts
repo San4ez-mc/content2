@@ -66,6 +66,11 @@ ${combined}`;
     return NextResponse.json({ ok: false, error: "не вдалось розпарсити JSON від LLM", raw: text.slice(0, 300) }, { status: 500 });
   }
 
+  const S = (v: any): string | undefined =>
+    v == null ? undefined
+    : Array.isArray(v) ? (v.filter((x) => x != null && x !== "").map(String).join("; ") || undefined)
+    : typeof v === "object" ? JSON.stringify(v)
+    : String(v);
   const normName = (s: any) => String(s || "").toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
   const findByName = async (m: any, f: string, v: string) => {
     const target = normName(v);
@@ -80,7 +85,7 @@ ${combined}`;
   for (const p of (Array.isArray(data.products) ? data.products : [])) {
     if (!p?.name) continue;
     const ex = await findByName(prisma.product, "name", String(p.name));
-    const f = { description: p.description || undefined, price: p.price || undefined, audience: p.audience || undefined, pains: p.pains || undefined, transformation: p.transformation || undefined, benefits: p.benefits || undefined, priority: Number.isFinite(Number(p.priority)) ? Number(p.priority) : undefined };
+    const f = { description: S(p.description), price: S(p.price), audience: S(p.audience), pains: S(p.pains), transformation: S(p.transformation), benefits: S(p.benefits), priority: Number.isFinite(Number(p.priority)) ? Number(p.priority) : undefined };
     const rec = ex ? await prisma.product.update({ where: { id: ex.id }, data: f }) : await prisma.product.create({ data: { projectId, name: String(p.name), ...f } });
     productMap.set(String(p.name).toLowerCase().trim(), rec.id);
     pc++;
@@ -92,7 +97,7 @@ ${combined}`;
   for (const p of (Array.isArray(data.personas) ? data.personas : [])) {
     if (!p?.name) continue;
     const ex = await findByName(prisma.persona, "name", String(p.name));
-    const f = { pains: p.pains || undefined, goals: p.goals || undefined, triggers: p.triggers || undefined, objections: p.objections || undefined, language: p.language || undefined, tone: p.tone || undefined, forbiddenWords: p.forbiddenWords || undefined };
+    const f = { pains: S(p.pains), goals: S(p.goals), triggers: S(p.triggers), objections: S(p.objections), language: S(p.language), tone: S(p.tone), forbiddenWords: S(p.forbiddenWords) };
     ex ? await prisma.persona.update({ where: { id: ex.id }, data: f }) : await prisma.persona.create({ data: { projectId, name: String(p.name), ...f } });
     prc++;
   }
@@ -100,7 +105,7 @@ ${combined}`;
     if (!c?.title) continue;
     const productId = c.product ? productMap.get(String(c.product).toLowerCase().trim()) : undefined;
     const ex = await findByName(prisma.case, "title", String(c.title));
-    const f = { niche: c.niche || undefined, problem: c.problem || undefined, solution: c.solution || undefined, metrics: (c.metrics && typeof c.metrics === "object") ? c.metrics : undefined, allowedClaims: c.allowedClaims || undefined, ...(productId ? { productId } : {}) };
+    const f = { niche: S(c.niche), problem: S(c.problem), solution: S(c.solution), metrics: (c.metrics && typeof c.metrics === "object") ? c.metrics : undefined, allowedClaims: S(c.allowedClaims), ...(productId ? { productId } : {}) };
     ex ? await prisma.case.update({ where: { id: ex.id }, data: f }) : await prisma.case.create({ data: { projectId, title: String(c.title), ...f } });
     cc++;
   }
