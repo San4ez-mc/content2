@@ -17,7 +17,7 @@ const NAV = [
   // { href: "/categories", label: "Категорії" },
   { href: "/topics", label: "Теми" },
   { href: "/storage", label: "Сховище" },
-  { href: "/content-types", label: "Структури" },
+  { href: "/structures", label: "Структури" },
   { href: "/tools", label: "Воронки" },
   { href: "/networks", label: "Мережі" },
   { href: "/stats", label: "Статистика" },

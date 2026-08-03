@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
+import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -45,16 +46,6 @@ export async function POST(req: NextRequest) {
     telegram_post: "telegram",
   };
 
-  const POST_TYPE_MAP: Record<string, string> = {
-    post: "single",
-    carousel: "carousel",
-    stories: "stories",
-    reels: "single",
-    thread_chain: "thread_chain",
-    thread_single: "single",
-    threads_chain: "thread_chain",
-  };
-
   const AUDIENCE_VALID = new Set(["cold", "warm1", "warm2", "hot1", "hot2"]);
 
   type InsertedPost = { groupId: string; itemId: string; number: number; funnelSlug: string | null; funnelParams: Record<string, unknown> | null; content: string; platform: string };
@@ -81,7 +72,9 @@ export async function POST(req: NextRequest) {
     if (!network) network = networks.find((n) => n.isEnabled) || networks[0];
     if (!network) continue;
 
-    const postType = POST_TYPE_MAP[p.post_type] || "single";
+    // Єдиний словник форматів: нормалізуємо будь-який post_type/format → канон, enum деривуємо.
+    const formatKey = normalizeFormat(p.format ?? p.post_type);
+    const postType = formatToPostGroupType(formatKey);
     const audience = AUDIENCE_VALID.has(p.audience) ? p.audience : "cold";
     const postDate = p.date ? new Date(p.date) : new Date();
 
@@ -142,7 +135,7 @@ export async function POST(req: NextRequest) {
         where: { id: placeholder.id },
         data: itemData,
       });
-      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, ...atomData } });
+      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, formatKey, ...atomData } });
       groupId = placeholder.groupId;
       itemId = updatedItem.id;
       number = (placeholder.group as any).number;
@@ -153,6 +146,7 @@ export async function POST(req: NextRequest) {
           socialNetworkId: network.id,
           postDate,
           type: postType as any,
+          formatKey,
           audience,
           ...atomData,
           status: "scheduled",

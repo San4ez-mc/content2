@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/rateLimit";
 import { vectorSearch } from "@/lib/vector";
 import { scanWriting } from "@/lib/writingGate";
 import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
+import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
@@ -212,7 +213,8 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
       projectId,
       socialNetworkId: network.id,
       postDate: params.date ? new Date(String(params.date)) : new Date(),
-      type: (String(params.post_type || "single") === "post" ? "single" : String(params.post_type || "single")) as any,
+      type: formatToPostGroupType(normalizeFormat(params.format ?? params.post_type)) as any,
+      formatKey: normalizeFormat(params.format ?? params.post_type),
       audience: String(params.audience || "cold"),
       ...atoms,
       status: "scheduled",

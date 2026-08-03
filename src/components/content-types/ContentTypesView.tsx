@@ -73,7 +73,7 @@ export function ContentTypesView({ projectId }: Props) {
   }
 
   async function deleteType(id: string) {
-    if (!confirm("Видалити тип контенту?")) return;
+    if (!confirm("Видалити структуру?")) return;
     await fetch(`/api/content-types/${id}`, { method: "DELETE" });
     queryClient.invalidateQueries({ queryKey: ["contentTypes", projectId] });
   }
@@ -83,11 +83,11 @@ export function ContentTypesView({ projectId }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-canvas-subtle shrink-0">
         <div>
-          <p className="text-sm font-semibold text-fg">Типи контенту</p>
-          <p className="text-xs text-fg-muted">Шаблони з AI-промптами для генерації постів</p>
+          <p className="text-sm font-semibold text-fg">Структури</p>
+          <p className="text-xs text-fg-muted">Скелети постів: для яких мереж і форматів, які хуки, як будувати текст</p>
         </div>
         <button onClick={() => setCreating(true)} className="btn-primary text-xs px-3 py-1">
-          + Новий тип
+          + Нова структура
         </button>
       </div>
 
@@ -242,7 +242,7 @@ function ContentTypeModal({ projectId, initial, onClose, onSaved }: {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="bg-canvas-subtle border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <h3 className="text-sm font-semibold text-fg">{initial ? "Редагувати тип" : "Новий тип контенту"}</h3>
+          <h3 className="text-sm font-semibold text-fg">{initial ? "Редагувати структуру" : "Нова структура"}</h3>
           <button onClick={onClose} className="text-fg-subtle hover:text-fg text-lg">×</button>
         </div>
 
