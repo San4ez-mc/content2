@@ -103,6 +103,7 @@ model SocialNetwork {
   color      String?     // hex
   isEnabled  Boolean     @default(true) @map("is_enabled")
   sortOrder  Int         @default(0) @map("sort_order")
+  rules      String?     @db.Text // правила саме цієї мережі (тон, довжина, хештеги, лінки, алгоритм)
   project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   categories Category[]
   postGroups PostGroup[]
@@ -463,15 +464,23 @@ model KnowledgeEntry {
 
 // ─── Content Types ──────────────────────────────────────
 
+// Структури постів (скелети). Раніше «Типи». Per-project, засівається канонічним
+// набором при створенні проєкту. platforms[] = яким мережам, postTypes[] = яким форматам.
 model ContentType {
   id          String   @id @default(cuid())
   projectId   String   @map("project_id")
   name        String
   description String?  @db.Text
-  prompt      String   @db.Text
+  prompt      String   @db.Text @default("")
   tone        String?
   structure   String?  @db.Text
-  platforms   Json     @default("[]")
+  platforms   Json     @default("[]") // мережі (platformKey[]): threads, instagram_posts, linkedin, telegram, tiktok
+  postTypes   Json     @default("[]") @map("post_types") // формати: post|carousel|thread|reel|story
+  minLen      Int?     @map("min_len")
+  maxLen      Int?     @map("max_len")
+  hookTypes   Json     @default("[]") @map("hook_types") // рекомендовані типи хуків
+  skeletonKey String?  @map("skeleton_key") // канонічний id для скорингу (aida|pas|case|...)
+  rules       String?  @db.Text // формат-специфічні правила (рілс/карусель)
   isActive    Boolean  @default(true) @map("is_active")
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")

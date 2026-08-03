@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess, isGateError } from "@/lib/tenant";
+import { DEFAULT_NETWORK_RULES } from "@/lib/seedStructures";
 
 export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get("projectId");
@@ -18,12 +19,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { projectId, name, platformKey, icon, color, sortOrder } = body;
+  const { projectId, name, platformKey, icon, color, sortOrder, rules } = body;
   const gate = await requireProjectAccess(projectId);
   if (isGateError(gate)) return gate.error;
 
   const network = await prisma.socialNetwork.create({
-    data: { projectId, name, platformKey, icon, color, sortOrder: sortOrder ?? 0 },
+    // Нова мережа одразу отримує канонічні правила платформи (можна відредагувати).
+    data: { projectId, name, platformKey, icon, color, sortOrder: sortOrder ?? 0, rules: rules ?? DEFAULT_NETWORK_RULES[platformKey] ?? null },
   });
 
   return NextResponse.json(network);
