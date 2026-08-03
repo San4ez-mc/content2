@@ -19,9 +19,17 @@ export async function PATCH(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { id, aiDescription, exampleOutput, paramsSchema, isActive, sortOrder } = body;
+  const { id, aiDescription, exampleOutput, isActive, sortOrder } = body;
+  let { paramsSchema } = body;
 
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // paramsSchema має бути масивом (Json). Якщо прийшов рядком — розпарсити, щоб не зберігати
+  // подвійно-закодований JSON (через це падала сторінка /tools).
+  if (typeof paramsSchema === "string") {
+    try { const x = JSON.parse(paramsSchema); paramsSchema = Array.isArray(x) ? x : undefined; } catch { paramsSchema = undefined; }
+  }
+  if (paramsSchema !== undefined && !Array.isArray(paramsSchema)) paramsSchema = undefined;
 
   const updated = await prisma.contentTool.update({
     where: { id },

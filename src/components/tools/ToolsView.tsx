@@ -35,7 +35,15 @@ export function ToolsView() {
     setLoading(true);
     const res = await fetch("/api/tools");
     const data = await res.json();
-    setTools(Array.isArray(data) ? data : []);
+    // paramsSchema може прийти рядком (подвійно-закодований JSON) — нормалізуємо до масиву,
+    // щоб .map() не валив сторінку.
+    const asArray = (v: unknown): ParamField[] => {
+      if (Array.isArray(v)) return v as ParamField[];
+      if (typeof v === "string") { try { const x = JSON.parse(v); return Array.isArray(x) ? x : []; } catch { return []; } }
+      return [];
+    };
+    const norm = (Array.isArray(data) ? data : []).map((t: ContentTool) => ({ ...t, paramsSchema: asArray(t.paramsSchema) }));
+    setTools(norm);
     setLoading(false);
   }, []);
 
