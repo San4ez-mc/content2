@@ -160,6 +160,7 @@ model PostGroup {
   postDate        DateTime      @map("post_date") @db.Date
   type            PostGroupType @default(single)
   formatKey       String?       @map("format_key") // уніфікований формат: post|story|reel|carousel|thread|short|slideshow
+  topic           String?       @db.Text // тема поста (used_topic від генератора; можна змінити й перегенерувати)
   audience        String?       // cold, warm1, warm2, hot1, hot2
   status          PostStatus    @default(draft)
   scheduleTime    String?       @map("schedule_time") // "09:00"
