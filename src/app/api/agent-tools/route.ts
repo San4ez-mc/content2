@@ -342,7 +342,7 @@ async function getCases(projectId: string) {
       c.problem ? `проблема — ${short(c.problem)}` : "", c.solution ? `рішення — ${short(c.solution)}` : "",
       m ? `результат — ${short(m, 120)}` : "", c.allowedClaims ? `можна казати — ${short(c.allowedClaims, 120)}` : "",
     ].filter(Boolean).join("; ");
-    return `• «${c.title}»${c.niche ? ` [${c.niche}]` : ""}${c.product ? ` (продукт: ${c.product})` : ""}: ${parts}`;
+    return `• «${c.title}»${c.niche ? ` [${c.niche}]` : ""}${c.product?.name ? ` (продукт: ${c.product.name})` : ""}: ${parts}`;
   }).join("\n");
   return NextResponse.json({
     ok: true, count: cases.length, text,
