@@ -71,5 +71,14 @@ export async function POST(req: NextRequest) {
     `Стратегія: ${strategy ? "є" : "нема"}. Бренд/ToV: ${brand ? "є" : "нема"}.`,
   ].join(" ");
 
-  return NextResponse.json({ ok: true, exists: true, projectId: pid, projectName: project.name, progress, known, gaps, summary });
+  // Публічні посилання на заповнені сторінки — агент дає їх клієнту («глянь результат»).
+  const BASE = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+  const links = {
+    all: `${BASE}/user-data`,        // усе разом: продукти, персони, кейси, стратегія
+    products: `${BASE}/products`,
+    topics: `${BASE}/topics`,
+    leadMagnets: `${BASE}/lead-magnets`,
+  };
+
+  return NextResponse.json({ ok: true, exists: true, projectId: pid, projectName: project.name, progress, known, gaps, summary, links });
 }

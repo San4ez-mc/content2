@@ -158,5 +158,14 @@ export async function POST(req: NextRequest) {
   // Ре-синк Client Static у вектор (fire-and-forget — не блокуємо воронку).
   syncStaticToVector(pid).catch(() => {});
 
-  return NextResponse.json({ ok: true, projectId: pid, kind, id: saved?.id ?? null, result: saved });
+  // Публічне посилання на сторінку, де видно збережений артефакт (агент дає клієнту).
+  const BASE = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+  const viewUrlByKind: Record<string, string> = {
+    product: `${BASE}/products`, products: `${BASE}/products`, leadmagnet: `${BASE}/lead-magnets`,
+    topics: `${BASE}/topics`, persona: `${BASE}/user-data`, case: `${BASE}/user-data`,
+    strategy: `${BASE}/user-data`, brand: `${BASE}/user-data`, doc: `${BASE}/storage`,
+  };
+  const viewUrl = viewUrlByKind[kind] || `${BASE}/user-data`;
+
+  return NextResponse.json({ ok: true, projectId: pid, kind, id: saved?.id ?? null, result: saved, viewUrl });
 }
