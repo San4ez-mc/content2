@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
+import { vectorSearch } from "@/lib/vector";
 
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
@@ -60,6 +61,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_rules": return await getRules(projectId, params);
       case "get_writing_core": return await getWritingCore();
       case "check_writing": return await checkWriting(params);
+      case "query_vector": return await queryVector(projectId, params);
       case "get_personas": return await getPersonas(projectId);
       case "get_cases": return await getCases(projectId);
       case "get_strategy": return await getStrategy(projectId);
@@ -336,6 +338,18 @@ async function getWritingCore() {
     orderBy: { updatedAt: "desc" }, select: { content: true },
   });
   return NextResponse.json({ ok: true, text: e?.content || "" });
+}
+
+// Семантичний пошук по базі знань компанії (живий вектор-мікросервіс) — замінює
+// мертві NLM/openai-kb. Контент (стиль автора, правила по мережах) уже у static-колекції.
+async function queryVector(projectId: string, params: Record<string, unknown>) {
+  const query = String(params.query || params.question || "").trim();
+  if (!query) return NextResponse.json({ ok: true, text: "", count: 0 });
+  const proj = await prisma.project.findUnique({ where: { id: projectId }, select: { vectorToken: true } });
+  if (!proj?.vectorToken) return NextResponse.json({ ok: true, text: "", count: 0, note: "no vector token" });
+  const results = await vectorSearch(proj.vectorToken, query, { collections: ["static", "global"], limit: 6 });
+  const text = (results || []).map((r: any) => String(r.content || r.text || "")).filter(Boolean).join("\n---\n");
+  return NextResponse.json({ ok: true, text, answer: text, count: (results || []).length });
 }
 
 // Шар 2 — детермінований grep-gate (100% надійно, на відміну від промпту ~80%).
