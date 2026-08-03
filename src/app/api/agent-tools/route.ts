@@ -4,6 +4,8 @@ import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
 import { vectorSearch } from "@/lib/vector";
+import { scanWriting } from "@/lib/writingGate";
+import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
 
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
@@ -371,28 +373,7 @@ async function queryVector(projectId: string, params: Record<string, unknown>) {
   return NextResponse.json({ ok: true, text, answer: text, count: (results || []).length });
 }
 
-// Шар 2 — детермінований grep-gate (100% надійно, на відміну від промпту ~80%).
-// Ловить те, що чітко детектується: стоп-слова, щільність тире, підсумкові кліше, привітання.
-const WBANNED = ["безумовно", "вкрай важливо", "слід зазначити", "варто зазначити", "важливо розуміти", "на сьогоднішній день", "у сучасному світі", "таким чином", "підбиваючи підсумок", "ключовий момент", "це дозволяє", "здійснювати", "багатогранний", "нюансований", "безшовний", "delve", "nuanced", "seamless", "robust", "tapestry", "in conclusion", "розкриємо таємниці", "зануримося у світ", "в наш час", "кожен з нас"];
-const WSUMMARY = ["отже", "таким чином", "підбиваючи підсумок", "на закінчення", "підсумовуючи", "у підсумку", "в цілому"];
-const WGREETING = ["привіт", "друзі", "доброго дня", "сьогодні поговоримо", "хочу поділитися", "давно хотів", "давно хотіла"];
-
-function scanWriting(text: string) {
-  const violations: { type: string; detail: string }[] = [];
-  const low = text.toLowerCase();
-  for (const w of WBANNED) if (low.includes(w)) violations.push({ type: "banned_word", detail: `стоп-слово «${w}»` });
-  const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  for (const p of paras) {
-    const dashes = (p.match(/—/g) || []).length;
-    if (dashes > 1) violations.push({ type: "dash_overuse", detail: `${dashes} тире в одному абзаці (макс 1)` });
-    const pl = p.toLowerCase();
-    for (const c of WSUMMARY) if (pl.startsWith(c + " ") || pl.startsWith(c + ",")) violations.push({ type: "summary_cliche", detail: `абзац починається з «${c}»` });
-  }
-  const start = low.replace(/^\s+/, "").slice(0, 45);
-  for (const g of WGREETING) if (start.includes(g)) violations.push({ type: "greeting_start", detail: `привітання на старті «${g}»` });
-  return violations;
-}
-
+// Шар 2 — детермінований grep-gate. Логіку винесено в @/lib/writingGate (тестовано).
 async function checkWriting(params: Record<string, unknown>) {
   const text = String(params.text || "");
   if (!text.trim()) return NextResponse.json({ ok: true, pass: true, count: 0, violations: [], text: "Порожній текст." });
@@ -562,16 +543,10 @@ async function validStructureKeys(projectId: string): Promise<Set<string>> {
 // C2 case integrity: заявлений «кейс» приймаємо, ТІЛЬКИ якщо він збігається з реальним
 // записом Case (за точною назвою). Інакше — downgrade у story, щоб вигадка не видавалась
 // за реальний кейс. Захищає й від D4 (нема КБ → нема реальних кейсів → усе в story).
-const normCase = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
 async function resolveCaseIntegrity(projectId: string, evidenceType: string | null, caseTitle: unknown): Promise<{ evidenceType: string | null; caseId: string | null }> {
   if (evidenceType !== "case") return { evidenceType, caseId: null };
-  const t = normCase(String(caseTitle || ""));
-  if (t) {
-    const cases = await prisma.case.findMany({ where: { projectId }, select: { id: true, title: true } });
-    const hit = cases.find((c) => normCase(c.title) === t);
-    if (hit) return { evidenceType: "case", caseId: hit.id };
-  }
-  return { evidenceType: "story", caseId: null }; // немає реального кейса → не видаємо за кейс
+  const cases = await prisma.case.findMany({ where: { projectId }, select: { id: true, title: true } });
+  return resolveCaseIntegrityPure(cases as CaseRef[], evidenceType, caseTitle); // чиста логіка з @/lib/caseIntegrity
 }
 
 // Builds the base Telegram deep-link for a lead magnet: t.me/<bot>?start=<param>
