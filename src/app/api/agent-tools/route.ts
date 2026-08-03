@@ -307,11 +307,21 @@ async function getRules(projectId: string, params: Record<string, unknown>) {
   return NextResponse.json({ ok: true, count: entries.length, rules });
 }
 
+const short = (v: any, n = 160) => { const s = String(v || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
+
 // Персони (ЦА) — кому і як говоримо. Канонічний документ №2 бази контент-плану.
 async function getPersonas(projectId: string) {
   const personas = await prisma.persona.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } });
+  const text = personas.map((p) => {
+    const parts = [
+      p.pains ? `болі — ${short(p.pains)}` : "", p.triggers ? `тригери — ${short(p.triggers)}` : "",
+      p.objections ? `заперечення — ${short(p.objections)}` : "", p.tone ? `тон — ${short(p.tone, 80)}` : "",
+      p.forbiddenWords ? `уникати — ${short(p.forbiddenWords, 80)}` : "",
+    ].filter(Boolean).join("; ");
+    return `• ${p.name}${p.type ? ` (${p.type})` : ""}: ${parts}`;
+  }).join("\n");
   return NextResponse.json({
-    ok: true, count: personas.length,
+    ok: true, count: personas.length, text,
     personas: personas.map((p) => ({
       id: p.id, name: p.name, type: p.type, pains: p.pains, goals: p.goals,
       triggers: p.triggers, objections: p.objections, language: p.language,
@@ -326,8 +336,16 @@ async function getCases(projectId: string) {
     where: { projectId }, orderBy: { createdAt: "asc" },
     include: { product: { select: { name: true } } },
   });
+  const text = cases.map((c) => {
+    const m = c.metrics && typeof c.metrics === "object" ? Object.entries(c.metrics as any).map(([k, v]) => `${k}: ${v}`).join(", ") : "";
+    const parts = [
+      c.problem ? `проблема — ${short(c.problem)}` : "", c.solution ? `рішення — ${short(c.solution)}` : "",
+      m ? `результат — ${short(m, 120)}` : "", c.allowedClaims ? `можна казати — ${short(c.allowedClaims, 120)}` : "",
+    ].filter(Boolean).join("; ");
+    return `• «${c.title}»${c.niche ? ` [${c.niche}]` : ""}${c.product ? ` (продукт: ${c.product})` : ""}: ${parts}`;
+  }).join("\n");
   return NextResponse.json({
-    ok: true, count: cases.length,
+    ok: true, count: cases.length, text,
     cases: cases.map((c) => ({
       id: c.id, title: c.title, product: c.product?.name || null, niche: c.niche,
       problem: c.problem, solution: c.solution, metrics: c.metrics, allowedClaims: c.allowedClaims,
@@ -338,9 +356,13 @@ async function getCases(projectId: string) {
 // SMM-стратегія — скелет плану: контент-стовпи (рубрики) + розподіл інтенту.
 async function getStrategy(projectId: string) {
   const s = await prisma.smmStrategy.findFirst({ where: { projectId }, orderBy: { version: "desc" } });
-  if (!s) return NextResponse.json({ ok: true, strategy: null });
+  if (!s) return NextResponse.json({ ok: true, strategy: null, text: "" });
+  const pillars = Array.isArray(s.contentPillars) ? (s.contentPillars as any[]).join(", ") : "";
+  const intent = s.intentDistribution && typeof s.intentDistribution === "object"
+    ? Object.entries(s.intentDistribution as any).map(([k, v]) => `${k} ${v}`).join(", ") : "";
+  const text = [pillars ? `Контент-стовпи: ${pillars}.` : "", intent ? `Баланс цілей: ${intent}.` : ""].filter(Boolean).join(" ");
   return NextResponse.json({
-    ok: true,
+    ok: true, text,
     strategy: { version: s.version, contentPillars: s.contentPillars, intentDistribution: s.intentDistribution },
   });
 }
