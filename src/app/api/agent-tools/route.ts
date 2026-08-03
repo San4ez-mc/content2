@@ -58,6 +58,9 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "send_media": return await sendMedia(projectId, params, telegramChatId, telegramBotToken);
       case "list_media": return await listMedia(projectId);
       case "get_rules": return await getRules(projectId, params);
+      case "get_personas": return await getPersonas(projectId);
+      case "get_cases": return await getCases(projectId);
+      case "get_strategy": return await getStrategy(projectId);
       case "save_rule": return await saveRule(projectId, params);
       case "get_topics": return await getTopics(projectId, params);
       case "get_structures": return await getStructures(projectId);
@@ -287,15 +290,59 @@ async function listMedia(projectId: string) {
   });
 }
 
-// Assembled project content rules for AI prompts (per-project, editable in /knowledge UI)
+// Assembled project content rules for AI prompts (per-project, editable in /knowledge UI).
+// За замовчуванням ВИКЛЮЧАЄ сирі завантажені доки (onboarding-doc*): вони вже розібрані
+// в структуру (продукти/персони/кейси) і не мають вивалюватись у промпт гуртом. Якщо
+// потрібен конкретний док — передай явну category.
 async function getRules(projectId: string, params: Record<string, unknown>) {
   const category = params.category ? String(params.category) : undefined;
   const entries = await prisma.knowledgeEntry.findMany({
-    where: { projectId, isActive: true, ...(category ? { category } : {}) },
+    where: {
+      projectId, isActive: true,
+      ...(category ? { category } : { NOT: { category: { startsWith: "onboarding-doc" } } }),
+    },
     orderBy: [{ category: "asc" }, { createdAt: "asc" }],
   });
   const rules = entries.map((e) => `### ${e.title}\n${e.content}`).join("\n\n");
   return NextResponse.json({ ok: true, count: entries.length, rules });
+}
+
+// Персони (ЦА) — кому і як говоримо. Канонічний документ №2 бази контент-плану.
+async function getPersonas(projectId: string) {
+  const personas = await prisma.persona.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } });
+  return NextResponse.json({
+    ok: true, count: personas.length,
+    personas: personas.map((p) => ({
+      id: p.id, name: p.name, type: p.type, pains: p.pains, goals: p.goals,
+      triggers: p.triggers, objections: p.objections, language: p.language,
+      tone: p.tone, forbiddenWords: p.forbiddenWords,
+    })),
+  });
+}
+
+// Кейси / доказова база — BOFU + довіра. allowedClaims = дозволені формулювання (case integrity).
+async function getCases(projectId: string) {
+  const cases = await prisma.case.findMany({
+    where: { projectId }, orderBy: { createdAt: "asc" },
+    include: { product: { select: { name: true } } },
+  });
+  return NextResponse.json({
+    ok: true, count: cases.length,
+    cases: cases.map((c) => ({
+      id: c.id, title: c.title, product: c.product?.name || null, niche: c.niche,
+      problem: c.problem, solution: c.solution, metrics: c.metrics, allowedClaims: c.allowedClaims,
+    })),
+  });
+}
+
+// SMM-стратегія — скелет плану: контент-стовпи (рубрики) + розподіл інтенту.
+async function getStrategy(projectId: string) {
+  const s = await prisma.smmStrategy.findFirst({ where: { projectId }, orderBy: { version: "desc" } });
+  if (!s) return NextResponse.json({ ok: true, strategy: null });
+  return NextResponse.json({
+    ok: true,
+    strategy: { version: s.version, contentPillars: s.contentPillars, intentDistribution: s.intentDistribution },
+  });
 }
 
 async function saveRule(projectId: string, params: Record<string, unknown>) {

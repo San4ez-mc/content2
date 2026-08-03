@@ -6,6 +6,7 @@ interface Data {
   projectId: string;
   projectName: string;
   brand: { id: string; category: string; title: string; content: string; updatedAt: string }[];
+  sourceDocs: { id: string; category: string; title: string; content: string; updatedAt: string }[];
   personas: { id: string; name: string; age: number | null; gender: string | null; type: string | null; pains: string | null; goals: string | null; tone: string | null; forbiddenWords: string | null; triggers: string | null; objections: string | null; language: string | null }[];
   products: { id: string; name: string; description: string | null; price: string | null; audience: string | null; pains: string | null; transformation: string | null; benefits: string | null; priority: number | null; leadMagnets: { id: string; name: string }[] }[];
   cases: { id: string; title: string; niche: string | null; problem: string | null; solution: string | null; metrics: Record<string, any> | null; allowedClaims: string | null }[];
@@ -23,11 +24,11 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Section({
-  title, count, section, projectId, children, empty,
+  title, count, section, projectId, children, empty, defaultOpen = true, noDownload = false, subtitle,
 }: {
-  title: string; count: number; section: string; projectId: string; children: React.ReactNode; empty?: string;
+  title: string; count: number; section: string; projectId: string; children: React.ReactNode; empty?: string; defaultOpen?: boolean; noDownload?: boolean; subtitle?: string;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border border-border rounded-xl bg-canvas-subtle overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
@@ -35,8 +36,9 @@ function Section({
           <span className="text-fg-subtle text-xs">{open ? "▾" : "▸"}</span>
           {title}
           <span className="text-[10px] px-1.5 py-0.5 bg-border/60 text-fg-muted rounded-full">{count}</span>
+          {subtitle && <span className="text-[11px] font-normal text-fg-subtle">{subtitle}</span>}
         </button>
-        {count > 0 && (
+        {count > 0 && !noDownload && (
           <a
             href={`/api/brand-doc?projectId=${projectId}&section=${section}`}
             className="text-xs px-2.5 py-1 rounded border border-border text-fg-muted hover:text-fg hover:bg-canvas transition-colors"
@@ -189,6 +191,26 @@ export function UserDataView({ data }: { data: Data }) {
           </div>
           <a href="/topics" className="text-xs text-accent hover:underline">Відкрити «Теми» →</a>
         </div>
+
+        {/* Вихідні матеріали (джерело) — сирі завантажені документи. НЕ база генерації:
+            вони вже розібрані в структуру вище. Лишаються для довідки + точкового пошуку. */}
+        {data.sourceDocs.length > 0 && (
+          <Section
+            title="Вихідні матеріали (джерело)"
+            count={data.sourceDocs.length}
+            section="source"
+            projectId={projectId}
+            defaultOpen={false}
+            noDownload
+            subtitle="завантажені доки — джерело, не база контент-плану"
+          >
+            {data.sourceDocs.map((d) => (
+              <Card key={d.id} title={d.title} subtitle={`категорія: ${d.category}`}>
+                <p className="text-xs text-fg-muted whitespace-pre-wrap">{d.content}</p>
+              </Card>
+            ))}
+          </Section>
+        )}
       </div>
     </div>
   );
