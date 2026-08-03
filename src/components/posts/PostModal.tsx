@@ -38,6 +38,7 @@ interface PostGroup {
   scheduleTime: string | null;
   categoryId: string | null;
   personaId: string | null;
+  formatKey?: string | null;
   intent?: string | null;
   structureId?: string | null;
   evidenceType?: string | null;
@@ -85,6 +86,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [scheduleTime, setScheduleTime] = useState(group.scheduleTime || "");
   const [categoryId, setCategoryId] = useState(group.categoryId || "");
   const [personaId, setPersonaId] = useState(group.personaId || "");
+  const [formatKey, setFormatKey] = useState(group.formatKey || "");
   const [saving, setSaving] = useState(false);
   const [charCounts, setCharCounts] = useState<Record<number, number>>({});
   const [comment, setComment] = useState("");
@@ -97,6 +99,13 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
     queryKey: ["categories", pid],
     queryFn: () => fetch(`/api/categories?projectId=${pid}`).then((r) => r.json()),
     enabled: !!pid && activeTab === "settings",
+    staleTime: 60_000,
+  });
+
+  const { data: formats = [] } = useQuery<any[]>({
+    queryKey: ["formats", group.socialNetwork.id],
+    queryFn: () => fetch(`/api/formats?networkId=${group.socialNetwork.id}`).then((r) => r.json()),
+    enabled: activeTab === "settings",
     staleTime: 60_000,
   });
 
@@ -133,6 +142,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
           scheduleTime: scheduleTime || null,
           categoryId: categoryId || null,
           personaId: personaId || null,
+          formatKey: formatKey || null,
           items,
         }),
       });
@@ -625,6 +635,21 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {formats.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-fg-muted mb-1.5">🧩 Формат</label>
+                  <select className="input" value={formatKey} onChange={(e) => setFormatKey(e.target.value)}>
+                    <option value="">Не вказано</option>
+                    {formats.map((f: any) => (
+                      <option key={f.id} value={f.key}>{f.name} ({f.aspect || "—"})</option>
+                    ))}
+                  </select>
+                  {formatKey && formats.find((f: any) => f.key === formatKey)?.mediaTypes?.length > 0 && (
+                    <p className="text-[11px] text-fg-subtle mt-1">Медіа: {(formats.find((f: any) => f.key === formatKey)?.mediaTypes || []).join(", ")}</p>
+                  )}
                 </div>
               )}
 

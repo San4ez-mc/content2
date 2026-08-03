@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (denied) return denied;
 
   const body = await req.json();
-  const { status, audience, scheduleTime, categoryId, personaId, postDate, items,
+  const { status, audience, scheduleTime, categoryId, personaId, postDate, items, formatKey,
     intent, structureId, evidenceType, hookA, hookB, hookSelected, cta } = body; // #248 конструктор
 
   // Update group fields
@@ -38,6 +38,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       ...(personaId !== undefined && { personaId }),
       ...(postDate !== undefined && { postDate: new Date(postDate) }),
       // #248 атоми конструктора
+      ...(formatKey !== undefined && { formatKey: formatKey || null }),
       ...(intent !== undefined && { intent: intent || null }),
       ...(structureId !== undefined && { structureId: structureId || null }),
       ...(evidenceType !== undefined && { evidenceType: evidenceType || null }),
