@@ -63,6 +63,14 @@ export async function POST(req: NextRequest) {
   // claimed and filled here instead of creating duplicate posts.
   const claimedIds = new Set<string>();
 
+  // #248 Конструктор: атоми, які емітить генератор. Валідуємо id за канонічними наборами
+  // (postConstructor.ts) — сміття від LLM не пишемо. Далі йдуть у скоринг WinningPattern.
+  const A_INTENT = new Set(["educate", "sell", "trust", "storytelling", "entertainment"]);
+  const A_STRUCT = new Set(["aida", "pas", "case", "insight", "listicle", "provocation"]);
+  const A_EVID = new Set(["case", "example", "story"]);
+  const A_HOOK = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
+  const pick = (v: unknown, set: Set<string>) => (typeof v === "string" && set.has(v) ? v : null);
+
   for (const p of posts) {
     const platformKey = PLATFORM_MAP[p.platform] || p.platform || "instagram_posts";
     let network = networkByPlatform.get(platformKey);
@@ -72,6 +80,15 @@ export async function POST(req: NextRequest) {
     const postType = POST_TYPE_MAP[p.post_type] || "single";
     const audience = AUDIENCE_VALID.has(p.audience) ? p.audience : "cold";
     const postDate = p.date ? new Date(p.date) : new Date();
+
+    // Атоми конструктора (структура/хук/доказ/намір) → поля PostGroup для скорингу.
+    const atomData = {
+      intent: pick(p.intent, A_INTENT),
+      structureId: pick(p.structure, A_STRUCT),
+      evidenceType: pick(p.evidence_type, A_EVID),
+      hookSelected: pick(p.hook_type, A_HOOK),
+      ...(p.hook ? { hookA: String(p.hook).slice(0, 500) } : {}),
+    };
 
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;
@@ -114,7 +131,7 @@ export async function POST(req: NextRequest) {
         where: { id: placeholder.id },
         data: itemData,
       });
-      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience } });
+      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, ...atomData } });
       groupId = placeholder.groupId;
       itemId = updatedItem.id;
       number = (placeholder.group as any).number;
@@ -126,6 +143,7 @@ export async function POST(req: NextRequest) {
           postDate,
           type: postType as any,
           audience,
+          ...atomData,
           status: "scheduled",
           items: { create: [{ orderIndex: 0, ...itemData }] },
         },

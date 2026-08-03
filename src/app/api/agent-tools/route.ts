@@ -172,6 +172,18 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
     funnelParams = { ...(funnelParams || {}), palette: await pickRotatedPalette(projectId) };
   }
 
+  // #248 Конструктор: атоми (структура/хук/доказ/намір) з валідацією id → поля PostGroup.
+  const AI = new Set(["educate", "sell", "trust", "storytelling", "entertainment"]);
+  const AS = new Set(["aida", "pas", "case", "insight", "listicle", "provocation"]);
+  const AE = new Set(["case", "example", "story"]);
+  const AH = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
+  const pk = (v: unknown, s: Set<string>) => (typeof v === "string" && s.has(v) ? v : null);
+  const atoms = {
+    intent: pk(params.intent, AI), structureId: pk(params.structure, AS),
+    evidenceType: pk(params.evidence_type, AE), hookSelected: pk(params.hook_type, AH),
+    ...(params.hook ? { hookA: String(params.hook).slice(0, 500) } : {}),
+  };
+
   const group = await prisma.postGroup.create({
     data: {
       projectId,
@@ -179,6 +191,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
       postDate: params.date ? new Date(String(params.date)) : new Date(),
       type: (String(params.post_type || "single") === "post" ? "single" : String(params.post_type || "single")) as any,
       audience: String(params.audience || "cold"),
+      ...atoms,
       status: "scheduled",
       items: {
         create: [{
