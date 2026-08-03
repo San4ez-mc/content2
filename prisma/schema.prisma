@@ -42,6 +42,7 @@ model Project {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   projectUsers     ProjectUser[]
   socialNetworks   SocialNetwork[]
+  formats          Format[]
   categories       Category[]
   personas         Persona[]
   postGroups       PostGroup[]
@@ -104,9 +105,11 @@ model SocialNetwork {
   isEnabled  Boolean     @default(true) @map("is_enabled")
   sortOrder  Int         @default(0) @map("sort_order")
   rules      String?     @db.Text // правила саме цієї мережі (тон, довжина, хештеги, лінки, алгоритм)
+  linkPlacement String?  @map("link_placement") // куди йде CTA-лінк: comment | inline | bio | description
   project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   categories Category[]
   postGroups PostGroup[]
+  formats    Format[]
 
   @@map("social_networks")
 }
@@ -156,6 +159,7 @@ model PostGroup {
   personaId       String?       @map("persona_id")
   postDate        DateTime      @map("post_date") @db.Date
   type            PostGroupType @default(single)
+  formatKey       String?       @map("format_key") // уніфікований формат: post|story|reel|carousel|thread|short|slideshow
   audience        String?       // cold, warm1, warm2, hot1, hot2
   status          PostStatus    @default(draft)
   scheduleTime    String?       @map("schedule_time") // "09:00"
@@ -463,6 +467,30 @@ model KnowledgeEntry {
 }
 
 // ─── Content Types ──────────────────────────────────────
+
+// Формат = контейнер на платформі (пост/сторіз/рілс/карусель/тред/short/слайдшоу).
+// Прив'язаний до мережі; декларує дозволені медіа-типи + aspect + відео-налаштування.
+// Per-project, засівається канонічним набором. Редагується на сторінці мережі.
+model Format {
+  id              String       @id @default(cuid())
+  projectId       String       @map("project_id")
+  socialNetworkId String       @map("social_network_id")
+  key             String // post | story | reel | carousel | thread | short | slideshow
+  name            String
+  mediaTypes      Json         @default("[]") @map("media_types") // дозволені медіа-типи
+  aspect          String?      // 9:16 | 1:1 | 4:5 | 16:9
+  settings        Json         @default("{}") // відео/медіа-дефолти: subtitles, duration, music, thumbnail
+  sortOrder       Int          @default(0) @map("sort_order")
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([socialNetworkId])
+  @@map("formats")
+}
 
 // Структури постів (скелети). Раніше «Типи». Per-project, засівається канонічним
 // набором при створенні проєкту. platforms[] = яким мережам, postTypes[] = яким форматам.
