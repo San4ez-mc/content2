@@ -160,6 +160,20 @@ async function getPost(projectId: string, params: Record<string, unknown>) {
 }
 
 async function createPost(projectId: string, params: Record<string, unknown>, telegramChatId = "", telegramBotToken = "") {
+  // C3 hard-gate: детермінований критик відхиляє пост із порушеннями стандарту письма.
+  // Не зберігаємо — агент отримує список і має переписати (enforcement, не порада).
+  const gateText = String(params.content || "");
+  if (gateText.trim()) {
+    const gateViolations = scanWriting(gateText);
+    if (gateViolations.length > 0) {
+      return NextResponse.json({
+        ok: false,
+        error: "Пост НЕ збережено — не пройшов стандарт письма. Перепиши текст за списком і виклич create_post знову.",
+        violations: gateViolations.map((v) => v.detail),
+      });
+    }
+  }
+
   const platformKey = PLATFORM_MAP[String(params.platform)] || String(params.platform || "instagram_posts");
   const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
   const network = networks.find((n) => n.platformKey === platformKey) || networks.find((n) => n.isEnabled) || networks[0];
@@ -181,11 +195,15 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   const AE = new Set(["case", "example", "story"]);
   const AH = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
   const pk = (v: unknown, s: Set<string>) => (typeof v === "string" && s.has(v) ? v : null);
-  const atoms = {
+  const atoms: any = {
     intent: pk(params.intent, AI), structureId: pk(params.structure, AS),
     evidenceType: pk(params.evidence_type, AE), hookSelected: pk(params.hook_type, AH),
     ...(params.hook ? { hookA: String(params.hook).slice(0, 500) } : {}),
   };
+  // C2: валідуємо кейс проти реальних Case → downgrade у story, якщо вигаданий.
+  const ci = await resolveCaseIntegrity(projectId, atoms.evidenceType, params.case_title);
+  atoms.evidenceType = ci.evidenceType;
+  atoms.caseId = ci.caseId;
 
   const group = await prisma.postGroup.create({
     data: {
@@ -539,6 +557,21 @@ async function getNetworkRules(projectId: string, params: Record<string, unknown
 async function validStructureKeys(projectId: string): Promise<Set<string>> {
   const rows = await prisma.contentType.findMany({ where: { projectId, isActive: true, skeletonKey: { not: null } }, select: { skeletonKey: true } });
   return new Set(rows.map((r) => r.skeletonKey as string));
+}
+
+// C2 case integrity: заявлений «кейс» приймаємо, ТІЛЬКИ якщо він збігається з реальним
+// записом Case (за точною назвою). Інакше — downgrade у story, щоб вигадка не видавалась
+// за реальний кейс. Захищає й від D4 (нема КБ → нема реальних кейсів → усе в story).
+const normCase = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
+async function resolveCaseIntegrity(projectId: string, evidenceType: string | null, caseTitle: unknown): Promise<{ evidenceType: string | null; caseId: string | null }> {
+  if (evidenceType !== "case") return { evidenceType, caseId: null };
+  const t = normCase(String(caseTitle || ""));
+  if (t) {
+    const cases = await prisma.case.findMany({ where: { projectId }, select: { id: true, title: true } });
+    const hit = cases.find((c) => normCase(c.title) === t);
+    if (hit) return { evidenceType: "case", caseId: hit.id };
+  }
+  return { evidenceType: "story", caseId: null }; // немає реального кейса → не видаємо за кейс
 }
 
 // Builds the base Telegram deep-link for a lead magnet: t.me/<bot>?start=<param>

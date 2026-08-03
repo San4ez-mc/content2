@@ -68,6 +68,10 @@ export async function POST(req: NextRequest) {
   const A_INTENT = new Set(["educate", "sell", "trust", "storytelling", "entertainment"]);
   const A_STRUCT = new Set((await prisma.contentType.findMany({ where: { projectId, isActive: true, skeletonKey: { not: null } }, select: { skeletonKey: true } })).map((t) => t.skeletonKey as string));
   const A_EVID = new Set(["case", "example", "story"]);
+  // C2 case integrity: мапа реальних кейсів (нормалізована назва → id). Заявлений «кейс»,
+  // якого нема в базі, буде знижено у story (не видаємо вигадку за реальний кейс).
+  const normCase = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const caseByTitle = new Map((await prisma.case.findMany({ where: { projectId }, select: { id: true, title: true } })).map((c) => [normCase(c.title), c.id]));
   const A_HOOK = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
   const pick = (v: unknown, set: Set<string>) => (typeof v === "string" && set.has(v) ? v : null);
 
@@ -82,13 +86,20 @@ export async function POST(req: NextRequest) {
     const postDate = p.date ? new Date(p.date) : new Date();
 
     // Атоми конструктора (структура/хук/доказ/намір) → поля PostGroup для скорингу.
-    const atomData = {
+    const atomData: any = {
       intent: pick(p.intent, A_INTENT),
       structureId: pick(p.structure, A_STRUCT),
       evidenceType: pick(p.evidence_type, A_EVID),
       hookSelected: pick(p.hook_type, A_HOOK),
+      caseId: null,
       ...(p.hook ? { hookA: String(p.hook).slice(0, 500) } : {}),
     };
+    // C2: кейс валідний лише якщо збігається з реальним Case, інакше — story.
+    if (atomData.evidenceType === "case") {
+      const cid = caseByTitle.get(normCase(String(p.case_title || "")));
+      if (cid) atomData.caseId = cid;
+      else atomData.evidenceType = "story";
+    }
 
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;
