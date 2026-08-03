@@ -72,6 +72,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_topics": return await getTopics(projectId, params);
       case "get_structures": return await getStructures(projectId, params);
       case "get_network_rules": return await getNetworkRules(projectId, params);
+      case "get_formats": return await getFormats(projectId, params);
       case "get_products": return await getProducts(projectId);
       case "get_lead_magnets": return await getLeadMagnets(projectId, params);
       case "mark_topics_used": return await markTopicsUsed(projectId, params);
@@ -528,12 +529,29 @@ async function getStructures(projectId: string, params: Record<string, unknown> 
   return NextResponse.json({ ok: true, count: types.length, text, structures: types.map((t) => ({ key: t.skeletonKey, name: t.name, platforms: t.platforms, postTypes: t.postTypes })) });
 }
 
-// Правила соцмереж (тон/довжина/хештеги/лінки/алгоритм). Опційний platform — одна мережа.
+// Правила соцмереж (тон/довжина/хештеги/алгоритм) + куди йде CTA-лінк (linkPlacement).
 async function getNetworkRules(projectId: string, params: Record<string, unknown> = {}) {
   const platform = params.platform ? String(params.platform) : "";
   const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: platform } : {}) }, orderBy: { sortOrder: "asc" } });
-  const text = nets.filter((n) => n.rules).map((n) => `[${n.platformKey}] ${n.rules}`).join("\n\n");
+  const LINK_TXT: Record<string, string> = { comment: "у перший коментар", inline: "прямо в тексті", bio: "у шапку профілю (в пості лінк неактивний)", description: "в опис" };
+  const text = nets.filter((n) => n.rules || n.linkPlacement).map((n) => {
+    const link = n.linkPlacement ? ` Посилання (CTA): ${LINK_TXT[n.linkPlacement] || n.linkPlacement}.` : "";
+    return `[${n.platformKey}] ${n.rules || ""}${link}`;
+  }).join("\n\n");
   return NextResponse.json({ ok: true, count: nets.length, text });
+}
+
+// Формати по мережах (контейнер + дозволені медіа-типи + aspect). Опційний platform.
+async function getFormats(projectId: string, params: Record<string, unknown> = {}) {
+  const platform = params.platform ? String(params.platform) : "";
+  const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: platform } : {}) }, select: { id: true, platformKey: true } });
+  const netById = new Map(nets.map((n) => [n.id, n.platformKey]));
+  const formats = await prisma.format.findMany({ where: { projectId, isActive: true, socialNetworkId: { in: nets.map((n) => n.id) } }, orderBy: { sortOrder: "asc" } });
+  const text = formats.map((f) => {
+    const mt = Array.isArray(f.mediaTypes) ? (f.mediaTypes as string[]).join(", ") : "";
+    return `• ${netById.get(f.socialNetworkId)} → ${f.key} (${f.name}) [aspect ${f.aspect || "-"}; медіа: ${mt}]`;
+  }).join("\n");
+  return NextResponse.json({ ok: true, count: formats.length, text, formats: formats.map((f) => ({ platform: netById.get(f.socialNetworkId), key: f.key, name: f.name, mediaTypes: f.mediaTypes, aspect: f.aspect })) });
 }
 
 // Дозволені skeletonKey проєкту (для валідації structureId з генератора).
