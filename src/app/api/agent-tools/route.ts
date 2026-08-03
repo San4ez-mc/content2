@@ -58,6 +58,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "send_media": return await sendMedia(projectId, params, telegramChatId, telegramBotToken);
       case "list_media": return await listMedia(projectId);
       case "get_rules": return await getRules(projectId, params);
+      case "get_writing_core": return await getWritingCore();
       case "get_personas": return await getPersonas(projectId);
       case "get_cases": return await getCases(projectId);
       case "get_strategy": return await getStrategy(projectId);
@@ -308,6 +309,20 @@ async function getRules(projectId: string, params: Record<string, unknown>) {
 }
 
 const short = (v: any, n = 160) => { const s = String(v || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
+
+// ГЛОБАЛЬНЕ ядро правил письма — спільне для ВСІХ проєктів/воронок (не клієнт-специфічне).
+// Живе одним записом у службовому проєкті "__GLOBAL_RULES__" (category=writing-core),
+// редагується в одному місці. Завжди інжектиться в промпт генерації (Шар 1 стандарту письма).
+const GLOBAL_RULES_PROJECT = "__GLOBAL_RULES__";
+async function getWritingCore() {
+  const proj = await prisma.project.findFirst({ where: { name: GLOBAL_RULES_PROJECT }, select: { id: true } });
+  if (!proj) return NextResponse.json({ ok: true, text: "" });
+  const e = await prisma.knowledgeEntry.findFirst({
+    where: { projectId: proj.id, category: "writing-core", isActive: true },
+    orderBy: { updatedAt: "desc" }, select: { content: true },
+  });
+  return NextResponse.json({ ok: true, text: e?.content || "" });
+}
 
 // Персони (ЦА) — кому і як говоримо. Канонічний документ №2 бази контент-плану.
 async function getPersonas(projectId: string) {
