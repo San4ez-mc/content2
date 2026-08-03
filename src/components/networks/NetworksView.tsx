@@ -12,6 +12,7 @@ interface SocialNetwork {
   color: string | null;
   isEnabled: boolean;
   sortOrder: number;
+  rules: string | null;
 }
 
 interface ScheduleSettings {
@@ -122,6 +123,7 @@ export function NetworksView({ projectId, networks: initial, schedule: initialSc
 }
 
 function NetworksList({ networks, projectId, onRefresh }: { networks: SocialNetwork[]; projectId: string; onRefresh: () => void }) {
+  const [rulesFor, setRulesFor] = useState<SocialNetwork | null>(null);
   async function toggle(id: string, enabled: boolean) {
     await fetch(`/api/networks/${id}`, {
       method: "PATCH",
@@ -148,6 +150,7 @@ function NetworksList({ networks, projectId, onRefresh }: { networks: SocialNetw
   }
 
   return (
+    <>
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
       {networks.map((n) => {
         const preset = PLATFORM_PRESETS.find((p) => p.platformKey === n.platformKey);
@@ -195,6 +198,16 @@ function NetworksList({ networks, projectId, onRefresh }: { networks: SocialNetw
               />
             </button>
 
+            {/* Правила мережі */}
+            <button
+              onClick={() => setRulesFor(n)}
+              className={cn("text-[11px] px-2 py-1 rounded border transition-colors text-left",
+                n.rules ? "border-border text-fg-muted hover:text-fg hover:bg-canvas" : "border-dashed border-border/60 text-fg-subtle hover:text-accent")}
+              title="Правила письма для цієї мережі (тон, довжина, хештеги, лінки)"
+            >
+              📋 {n.rules ? "Правила" : "+ Правила"}
+            </button>
+
             {/* Delete */}
             <button
               onClick={() => deleteNetwork(n.id, n.name)}
@@ -205,6 +218,52 @@ function NetworksList({ networks, projectId, onRefresh }: { networks: SocialNetw
           </div>
         );
       })}
+      </div>
+      {rulesFor && (
+        <NetworkRulesModal
+          network={rulesFor}
+          onClose={() => setRulesFor(null)}
+          onSaved={() => { setRulesFor(null); onRefresh(); }}
+        />
+      )}
+    </>
+  );
+}
+
+function NetworkRulesModal({ network, onClose, onSaved }: { network: SocialNetwork; onClose: () => void; onSaved: () => void }) {
+  const [rules, setRules] = useState(network.rules || "");
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    setSaving(true);
+    try {
+      await fetch(`/api/networks/${network.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rules: rules || null }),
+      });
+      onSaved();
+    } finally { setSaving(false); }
+  }
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="bg-canvas-subtle border border-border rounded-xl shadow-2xl w-full max-w-lg animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-fg">📋 Правила мережі «{network.name}»</h3>
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg text-lg">×</button>
+        </div>
+        <div className="p-4 space-y-2">
+          <p className="text-xs text-fg-muted">Тон, довжина, хештеги, посилання, алгоритм. Ці правила ШІ застосовує саме до постів цієї мережі.</p>
+          <textarea
+            className="input text-xs min-h-[180px] font-mono"
+            value={rules}
+            onChange={(e) => setRules(e.target.value)}
+            placeholder="Напр.: Тон «Ви», 800-2000 символів, хук з першого рядка, посилання тільки в перший коментар…"
+          />
+        </div>
+        <div className="flex gap-2 px-5 pb-5">
+          <button onClick={onClose} className="btn-ghost flex-1 text-xs py-2">Скасувати</button>
+          <button onClick={save} disabled={saving} className="btn-primary flex-1 text-xs py-2">{saving ? "Збереження…" : "Зберегти"}</button>
+        </div>
+      </div>
     </div>
   );
 }

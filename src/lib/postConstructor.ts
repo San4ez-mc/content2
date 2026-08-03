@@ -12,7 +12,9 @@ export const INTENTS: Option[] = [
   { id: "entertainment", label: "Розвага", hint: "легкий, емоційний" },
 ];
 
-// Структура тексту (скелет) — поле PostGroup.structureId
+// Структура тексту (скелет) — поле PostGroup.structureId. Синхронізовано з канонічним
+// набором seedStructures.ts (14 skeletonKey). Джерело правди — таблиця content_types
+// проєкту; цей список — дефолтні лейбли для картки-конструктора та скорингу.
 export const STRUCTURES: Option[] = [
   { id: "aida", label: "AIDA-lite", hint: "Біль → Рішення → Кейс → CTA" },
   { id: "pas", label: "PAS", hint: "Проблема → Підсилення → Рішення → CTA" },
@@ -20,6 +22,14 @@ export const STRUCTURES: Option[] = [
   { id: "insight", label: "Інсайт / думка", hint: "Теза → Контекст → Поворот → Обговорення" },
   { id: "listicle", label: "Лістикл", hint: "«N способів…» → пункти → Збережи" },
   { id: "provocation", label: "Провокація", hint: "Непопулярна думка → Аргумент → Нюанс → CTA" },
+  { id: "short_thought", label: "Коротка думка", hint: "Одна гостра теза, 30-100 симв (Threads)" },
+  { id: "question", label: "Питання", hint: "Одне гостре питання 20-80 симв (Threads)" },
+  { id: "thread_chain", label: "Тред-ланцюг", hint: "3-5 частин 1/N (Threads)" },
+  { id: "long_story", label: "Довга історія", hint: "Сцена з практики 150-400 симв" },
+  { id: "analysis", label: "Аналітичний розбір", hint: "B2B, цифри, висновок (LinkedIn)" },
+  { id: "carousel", label: "Карусель", hint: "Слайд1=хук → кроки → CTA" },
+  { id: "reels", label: "Рілс", hint: "Hook 3с → обіцянка → 3 біти → CTA" },
+  { id: "stories", label: "Сторіз", hint: "Хук-стікер → думка → свайп" },
 ];
 
 // Тип хука — зберігається як префікс/маркер; текст — у hookA/hookB

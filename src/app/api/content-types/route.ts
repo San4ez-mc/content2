@@ -17,11 +17,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { projectId, name, description, prompt, tone, structure, platforms } = body;
+  const { projectId, name, description, prompt, tone, structure, platforms, postTypes, hookTypes, skeletonKey, minLen, maxLen, rules } = body;
   const gate = await requireProjectAccess(projectId);
   if (isGateError(gate)) return gate.error;
-  if (!name || !prompt) {
-    return NextResponse.json({ error: "name, prompt required" }, { status: 400 });
+  if (!name) {
+    return NextResponse.json({ error: "name required" }, { status: 400 });
   }
 
   const type = await prisma.contentType.create({
@@ -29,10 +29,16 @@ export async function POST(req: NextRequest) {
       projectId,
       name,
       description: description || null,
-      prompt,
+      prompt: prompt || "",
       tone: tone || null,
       structure: structure || null,
       platforms: platforms || [],
+      postTypes: postTypes || [],
+      hookTypes: hookTypes || [],
+      skeletonKey: skeletonKey || null,
+      minLen: Number.isFinite(Number(minLen)) ? Number(minLen) : null,
+      maxLen: Number.isFinite(Number(maxLen)) ? Number(maxLen) : null,
+      rules: rules || null,
     },
   });
 

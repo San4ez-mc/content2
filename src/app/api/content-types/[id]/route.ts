@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (denied) return denied;
 
   const body = await req.json();
-  const { name, description, prompt, tone, structure, platforms, isActive, sortOrder } = body;
+  const { name, description, prompt, tone, structure, platforms, postTypes, hookTypes, skeletonKey, minLen, maxLen, rules, isActive, sortOrder } = body;
 
   const type = await prisma.contentType.update({
     where: { id: params.id },
@@ -19,6 +19,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(tone !== undefined && { tone }),
       ...(structure !== undefined && { structure }),
       ...(platforms !== undefined && { platforms }),
+      ...(postTypes !== undefined && { postTypes }),
+      ...(hookTypes !== undefined && { hookTypes }),
+      ...(skeletonKey !== undefined && { skeletonKey: skeletonKey || null }),
+      ...(minLen !== undefined && { minLen: minLen === null ? null : Number(minLen) }),
+      ...(maxLen !== undefined && { maxLen: maxLen === null ? null : Number(maxLen) }),
+      ...(rules !== undefined && { rules }),
       ...(isActive !== undefined && { isActive }),
       ...(sortOrder !== undefined && { sortOrder }),
     },
