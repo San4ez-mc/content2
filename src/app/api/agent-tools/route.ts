@@ -59,6 +59,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "list_media": return await listMedia(projectId);
       case "get_rules": return await getRules(projectId, params);
       case "get_writing_core": return await getWritingCore();
+      case "check_writing": return await checkWriting(params);
       case "get_personas": return await getPersonas(projectId);
       case "get_cases": return await getCases(projectId);
       case "get_strategy": return await getStrategy(projectId);
@@ -322,6 +323,38 @@ async function getWritingCore() {
     orderBy: { updatedAt: "desc" }, select: { content: true },
   });
   return NextResponse.json({ ok: true, text: e?.content || "" });
+}
+
+// Шар 2 — детермінований grep-gate (100% надійно, на відміну від промпту ~80%).
+// Ловить те, що чітко детектується: стоп-слова, щільність тире, підсумкові кліше, привітання.
+const WBANNED = ["безумовно", "вкрай важливо", "слід зазначити", "варто зазначити", "важливо розуміти", "на сьогоднішній день", "у сучасному світі", "таким чином", "підбиваючи підсумок", "ключовий момент", "це дозволяє", "здійснювати", "багатогранний", "нюансований", "безшовний", "delve", "nuanced", "seamless", "robust", "tapestry", "in conclusion", "розкриємо таємниці", "зануримося у світ", "в наш час", "кожен з нас"];
+const WSUMMARY = ["отже", "таким чином", "підбиваючи підсумок", "на закінчення", "підсумовуючи", "у підсумку", "в цілому"];
+const WGREETING = ["привіт", "друзі", "доброго дня", "сьогодні поговоримо", "хочу поділитися", "давно хотів", "давно хотіла"];
+
+function scanWriting(text: string) {
+  const violations: { type: string; detail: string }[] = [];
+  const low = text.toLowerCase();
+  for (const w of WBANNED) if (low.includes(w)) violations.push({ type: "banned_word", detail: `стоп-слово «${w}»` });
+  const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  for (const p of paras) {
+    const dashes = (p.match(/—/g) || []).length;
+    if (dashes > 1) violations.push({ type: "dash_overuse", detail: `${dashes} тире в одному абзаці (макс 1)` });
+    const pl = p.toLowerCase();
+    for (const c of WSUMMARY) if (pl.startsWith(c + " ") || pl.startsWith(c + ",")) violations.push({ type: "summary_cliche", detail: `абзац починається з «${c}»` });
+  }
+  const start = low.replace(/^\s+/, "").slice(0, 45);
+  for (const g of WGREETING) if (start.includes(g)) violations.push({ type: "greeting_start", detail: `привітання на старті «${g}»` });
+  return violations;
+}
+
+async function checkWriting(params: Record<string, unknown>) {
+  const text = String(params.text || "");
+  if (!text.trim()) return NextResponse.json({ ok: true, pass: true, count: 0, violations: [], text: "Порожній текст." });
+  const violations = scanWriting(text);
+  const summary = violations.length
+    ? "Порушення стандарту письма:\n" + violations.map((v) => `• ${v.detail}`).join("\n")
+    : "Стандарт письма пройдено, порушень немає.";
+  return NextResponse.json({ ok: true, pass: violations.length === 0, count: violations.length, violations, text: summary });
 }
 
 // Персони (ЦА) — кому і як говоримо. Канонічний документ №2 бази контент-плану.
