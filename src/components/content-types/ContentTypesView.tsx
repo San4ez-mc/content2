@@ -12,6 +12,9 @@ interface ContentType {
   tone: string | null;
   structure: string | null;
   platforms: string[];
+  postTypes?: string[];
+  rules?: string | null;
+  skeletonKey?: string | null;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
@@ -28,6 +31,15 @@ const PLATFORM_OPTIONS = [
   { key: "threads", label: "Threads" },
   { key: "linkedin", label: "LinkedIn" },
   { key: "tiktok", label: "TikTok" },
+  { key: "telegram", label: "Telegram" },
+];
+
+const POST_TYPE_OPTIONS = [
+  { key: "post", label: "Пост" },
+  { key: "thread", label: "Тред" },
+  { key: "carousel", label: "Карусель" },
+  { key: "reel", label: "Рілс" },
+  { key: "story", label: "Сторіз" },
 ];
 
 const TONE_OPTIONS = [
@@ -197,19 +209,24 @@ function ContentTypeModal({ projectId, initial, onClose, onSaved }: {
   const [tone, setTone] = useState(initial?.tone || "");
   const [structure, setStructure] = useState(initial?.structure || "");
   const [platforms, setPlatforms] = useState<string[]>((initial?.platforms as string[]) || []);
+  const [postTypes, setPostTypes] = useState<string[]>((initial?.postTypes as string[]) || []);
+  const [rules, setRules] = useState((initial as any)?.rules || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   function togglePlatform(key: string) {
     setPlatforms((prev) => prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]);
   }
+  function togglePostType(key: string) {
+    setPostTypes((prev) => prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]);
+  }
 
   async function save() {
-    if (!name.trim() || !prompt.trim()) { setError("Назва та промпт обов'язкові"); return; }
+    if (!name.trim()) { setError("Назва обов'язкова"); return; }
     setSaving(true);
     setError("");
     try {
-      const body = { projectId, name, description: description || null, prompt, tone: tone || null, structure: structure || null, platforms };
+      const body = { projectId, name, description: description || null, prompt, tone: tone || null, structure: structure || null, platforms, postTypes, rules: rules || null };
       const url = initial ? `/api/content-types/${initial.id}` : "/api/content-types";
       const method = initial ? "PATCH" : "POST";
       const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -289,6 +306,36 @@ function ContentTypeModal({ projectId, initial, onClose, onSaved }: {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1.5">Формати (для яких типів контенту)</label>
+            <div className="flex flex-wrap gap-1.5">
+              {POST_TYPE_OPTIONS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => togglePostType(p.key)}
+                  className={cn("text-xs px-2.5 py-0.5 rounded-full border transition-colors",
+                    postTypes.includes(p.key)
+                      ? "bg-accent text-white border-accent"
+                      : "text-fg-muted border-border hover:border-accent/50")}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1.5">Правила формату (напр. для рілсу/каруселі)</label>
+            <textarea
+              className="input resize-none"
+              rows={2}
+              value={rules}
+              onChange={(e) => setRules(e.target.value)}
+              placeholder="Напр.: 4-6 слайдів; слайд 1 = хук-обкладинка; останній = CTA…"
+            />
           </div>
         </div>
 
