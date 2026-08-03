@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   // #248 Конструктор: атоми, які емітить генератор. Валідуємо id за канонічними наборами
   // (postConstructor.ts) — сміття від LLM не пишемо. Далі йдуть у скоринг WinningPattern.
   const A_INTENT = new Set(["educate", "sell", "trust", "storytelling", "entertainment"]);
-  const A_STRUCT = new Set(["aida", "pas", "case", "insight", "listicle", "provocation"]);
+  const A_STRUCT = new Set((await prisma.contentType.findMany({ where: { projectId, isActive: true, skeletonKey: { not: null } }, select: { skeletonKey: true } })).map((t) => t.skeletonKey as string));
   const A_EVID = new Set(["case", "example", "story"]);
   const A_HOOK = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
   const pick = (v: unknown, set: Set<string>) => (typeof v === "string" && set.has(v) ? v : null);

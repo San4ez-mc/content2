@@ -67,7 +67,8 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_strategy": return await getStrategy(projectId);
       case "save_rule": return await saveRule(projectId, params);
       case "get_topics": return await getTopics(projectId, params);
-      case "get_structures": return await getStructures(projectId);
+      case "get_structures": return await getStructures(projectId, params);
+      case "get_network_rules": return await getNetworkRules(projectId, params);
       case "get_products": return await getProducts(projectId);
       case "get_lead_magnets": return await getLeadMagnets(projectId, params);
       case "mark_topics_used": return await markTopicsUsed(projectId, params);
@@ -176,7 +177,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
 
   // #248 Конструктор: атоми (структура/хук/доказ/намір) з валідацією id → поля PostGroup.
   const AI = new Set(["educate", "sell", "trust", "storytelling", "entertainment"]);
-  const AS = new Set(["aida", "pas", "case", "insight", "listicle", "provocation"]);
+  const AS = await validStructureKeys(projectId); // DB-driven: усі активні skeletonKey проєкту
   const AE = new Set(["case", "example", "story"]);
   const AH = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
   const pk = (v: unknown, s: Set<string>) => (typeof v === "string" && s.has(v) ? v : null);
@@ -509,13 +510,35 @@ async function getTopics(projectId: string, params: Record<string, unknown>) {
 }
 
 // Returns active post structures (content_types) as guidance text.
-async function getStructures(projectId: string) {
-  const types = await prisma.contentType.findMany({ where: { projectId, isActive: true }, orderBy: [{ sortOrder: "asc" }] });
+// Структури постів (скелети) — з тегами мереж/форматів/хуків. Опційний platform фільтрує
+// (структура доступна мережі, якщо її platforms порожні або містять цю мережу).
+async function getStructures(projectId: string, params: Record<string, unknown> = {}) {
+  const platform = params.platform ? String(params.platform) : "";
+  let types = await prisma.contentType.findMany({ where: { projectId, isActive: true }, orderBy: [{ sortOrder: "asc" }] });
+  if (platform) types = types.filter((t) => { const pl = Array.isArray(t.platforms) ? (t.platforms as string[]) : []; return pl.length === 0 || pl.includes(platform); });
+  const arr = (v: any) => (Array.isArray(v) ? (v as string[]) : []);
   const text = types.map((t) => {
-    const pl = Array.isArray(t.platforms) ? (t.platforms as string[]).join(", ") : "";
-    return `• ${t.name}${pl ? ` [${pl}]` : ""}${t.structure ? `: ${t.structure}` : t.description ? `: ${t.description}` : ""}`;
+    const pl = arr(t.platforms).join(", ") || "всі";
+    const pt = arr(t.postTypes).join("/") || "-";
+    const hk = arr(t.hookTypes).join(", ");
+    const len = t.minLen || t.maxLen ? ` ${t.minLen ?? "?"}-${t.maxLen ?? "?"}симв.` : "";
+    return `• ${t.name} [мережі: ${pl}; формати: ${pt}${len}; key=${t.skeletonKey || "-"}${hk ? `; хуки: ${hk}` : ""}]: ${t.structure || ""}${t.rules ? ` ПРАВИЛА ФОРМАТУ: ${t.rules}` : ""}`;
   }).join("\n");
-  return NextResponse.json({ ok: true, count: types.length, text });
+  return NextResponse.json({ ok: true, count: types.length, text, structures: types.map((t) => ({ key: t.skeletonKey, name: t.name, platforms: t.platforms, postTypes: t.postTypes })) });
+}
+
+// Правила соцмереж (тон/довжина/хештеги/лінки/алгоритм). Опційний platform — одна мережа.
+async function getNetworkRules(projectId: string, params: Record<string, unknown> = {}) {
+  const platform = params.platform ? String(params.platform) : "";
+  const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: platform } : {}) }, orderBy: { sortOrder: "asc" } });
+  const text = nets.filter((n) => n.rules).map((n) => `[${n.platformKey}] ${n.rules}`).join("\n\n");
+  return NextResponse.json({ ok: true, count: nets.length, text });
+}
+
+// Дозволені skeletonKey проєкту (для валідації structureId з генератора).
+async function validStructureKeys(projectId: string): Promise<Set<string>> {
+  const rows = await prisma.contentType.findMany({ where: { projectId, isActive: true, skeletonKey: { not: null } }, select: { skeletonKey: true } });
+  return new Set(rows.map((r) => r.skeletonKey as string));
 }
 
 // Builds the base Telegram deep-link for a lead magnet: t.me/<bot>?start=<param>
