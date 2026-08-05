@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
+import { scanWriting } from "@/lib/writingGate";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -94,6 +95,9 @@ export async function POST(req: NextRequest) {
       if (cid) atomData.caseId = cid;
       else atomData.evidenceType = "story";
     }
+    // C3 батч-критик: пост із порушеннями стандарту письма НЕ йде в графік —
+    // тримаємо як draft (на перевірку), а не «scheduled» (авто-публікація).
+    const groupStatus = scanWriting(String(p.content || "")).length > 0 ? "draft" : "scheduled";
 
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;
@@ -136,7 +140,7 @@ export async function POST(req: NextRequest) {
         where: { id: placeholder.id },
         data: itemData,
       });
-      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, formatKey, ...atomData } });
+      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, formatKey, status: groupStatus as any, ...atomData } });
       groupId = placeholder.groupId;
       itemId = updatedItem.id;
       number = (placeholder.group as any).number;
@@ -150,7 +154,7 @@ export async function POST(req: NextRequest) {
           formatKey,
           audience,
           ...atomData,
-          status: "scheduled",
+          status: groupStatus as any,
           items: { create: [{ orderIndex: 0, ...itemData }] },
         },
         include: { items: true },
