@@ -39,6 +39,7 @@ interface PostGroup {
   categoryId: string | null;
   personaId: string | null;
   formatKey?: string | null;
+  topic?: string | null;
   intent?: string | null;
   structureId?: string | null;
   evidenceType?: string | null;
@@ -87,6 +88,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [categoryId, setCategoryId] = useState(group.categoryId || "");
   const [personaId, setPersonaId] = useState(group.personaId || "");
   const [formatKey, setFormatKey] = useState(group.formatKey || "");
+  const [topic, setTopic] = useState(group.topic || "");
   const [saving, setSaving] = useState(false);
   const [charCounts, setCharCounts] = useState<Record<number, number>>({});
   const [comment, setComment] = useState("");
@@ -143,6 +145,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
           categoryId: categoryId || null,
           personaId: personaId || null,
           formatKey: formatKey || null,
+          topic: topic || null,
           items,
         }),
       });
@@ -205,6 +208,17 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
         items.length > 1 ? `[${i + 1}] ${it.content || ""}` : it.content || ""
       ).join("\n\n");
 
+      // Структуровані параметри поста (з поточного стану редактора) — щоб генератор
+      // тримав усе незмінним і змінив ЛИШЕ те, що ти правиш (напр. тему).
+      const personaName = personas.find((p: any) => p.id === personaId)?.name || "";
+      const atomsLines = [
+        formatKey ? `Формат: ${formatKey}` : "",
+        group.structureId ? `Структура: ${group.structureId}` : "",
+        personaName ? `Персона: ${personaName}` : "",
+        topic ? `Тема: ${topic}` : "",
+        group.intent ? `Намір: ${group.intent}` : "",
+      ].filter(Boolean);
+
       const text = [
         `Перегенеруй пост #${group.number ?? group.id.slice(0, 6)} (${group.socialNetwork.name}, ${postDate}):`,
         "",
@@ -212,8 +226,11 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
         postContent,
         "--- Кінець тексту ---",
         "",
+        atomsLines.length ? "ТРИМАЙ ці параметри незмінними (зміни лише те, що в правках нижче):" : "",
+        ...atomsLines.map((l) => "- " + l),
+        "",
         comment.trim() ? `Правки від автора:\n${comment.trim()}` : "Перегенеруй з урахуванням кращих практик для цієї мережі.",
-      ].join("\n");
+      ].filter((l) => l !== "").join("\n");
 
       if (sessionKey) {
         await fetch("/api/chat/send", {
@@ -652,6 +669,18 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                   )}
                 </div>
               )}
+
+              <div>
+                <label className="block text-xs font-medium text-fg-muted mb-1.5">💡 Тема</label>
+                <textarea
+                  className="input text-xs resize-none"
+                  rows={2}
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Про що пост. Зміни тему і натисни «Перегенерувати» — решта (формат, структура, персона) лишиться."
+                />
+                <p className="text-[11px] text-fg-subtle mt-1">Змінюй тему тут → перегенерація тримає інші параметри незмінними.</p>
+              </div>
 
               {personas.length > 0 && (
                 <div>

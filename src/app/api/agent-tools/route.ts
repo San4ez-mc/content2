@@ -208,6 +208,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   const ci = await resolveCaseIntegrity(projectId, atoms.evidenceType, params.case_title);
   atoms.evidenceType = ci.evidenceType;
   atoms.caseId = ci.caseId;
+  atoms.topic = params.used_topic ? String(params.used_topic).slice(0, 300) : null;
 
   const group = await prisma.postGroup.create({
     data: {

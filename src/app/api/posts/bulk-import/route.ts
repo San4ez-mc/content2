@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       evidenceType: pick(p.evidence_type, A_EVID),
       hookSelected: pick(p.hook_type, A_HOOK),
       caseId: null,
+      topic: p.used_topic ? String(p.used_topic).slice(0, 300) : null,
       ...(p.hook ? { hookA: String(p.hook).slice(0, 500) } : {}),
     };
     // C2: кейс валідний лише якщо збігається з реальним Case, інакше — story.
