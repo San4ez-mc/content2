@@ -89,6 +89,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [personaId, setPersonaId] = useState(group.personaId || "");
   const [formatKey, setFormatKey] = useState(group.formatKey || "");
   const [topic, setTopic] = useState(group.topic || "");
+  const [storageUrl, setStorageUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [charCounts, setCharCounts] = useState<Record<number, number>>({});
   const [comment, setComment] = useState("");
@@ -596,6 +597,25 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                   ? "⏳ Генерується — зачекайте..."
                   : "⚡ Згенерувати зображення"}
               </button>
+
+              <div className="pt-1 border-t border-border/40">
+                <label className="block text-xs font-medium text-fg-muted mb-1.5">📁 Або зі сховища (готовий файл)</label>
+                <div className="flex gap-2">
+                  <input
+                    className="input text-xs flex-1"
+                    value={storageUrl}
+                    onChange={(e) => setStorageUrl(e.target.value)}
+                    placeholder="https://… посилання на файл зі Сховища"
+                  />
+                  <button
+                    onClick={() => { if (storageUrl.trim()) { updateItem(activeItemIdx, { imagePath: storageUrl.trim(), generationStatus: "done" }); setStorageUrl(""); } }}
+                    className="btn-ghost text-xs px-3 shrink-0"
+                  >
+                    Використати
+                  </button>
+                </div>
+                <p className="text-[11px] text-fg-subtle mt-1">Скинь файл на сторінці «Сховище» → встав сюди посилання (джерело = сховище). Порожньо → воронка згенерує сама (авто).</p>
+              </div>
             </div>
           )}
 
