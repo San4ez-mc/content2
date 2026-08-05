@@ -28,7 +28,14 @@ export async function POST(req: NextRequest) {
     if (!process.env.SMTP_HOST) {
       devLink = link; // без SMTP (локально) — віддаємо лінк прямо
     } else {
-      // TODO(prod): надіслати лист із посиланням через SMTP
+      // Прод: надсилаємо лист із посиланням через SMTP.
+      const { sendMail } = await import("@/lib/mail");
+      await sendMail({
+        to: email,
+        subject: "Скидання пароля — FINEKO",
+        text: `Щоб скинути пароль, перейдіть за посиланням (дійсне 1 годину):\n${link}\n\nЯкщо ви не запитували скидання — проігноруйте цей лист.`,
+        html: `<p>Щоб скинути пароль, перейдіть за посиланням (дійсне 1 годину):</p><p><a href="${link}">${link}</a></p><p style="color:#888;font-size:12px">Якщо ви не запитували скидання — проігноруйте цей лист.</p>`,
+      }).catch((e) => { console.error("[forgot-password] SMTP send failed:", e?.message); });
     }
   }
 
