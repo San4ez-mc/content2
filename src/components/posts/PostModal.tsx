@@ -40,6 +40,7 @@ interface PostGroup {
   personaId: string | null;
   formatKey?: string | null;
   topic?: string | null;
+  scores?: Record<string, number> | null;
   intent?: string | null;
   structureId?: string | null;
   evidenceType?: string | null;
@@ -89,7 +90,24 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [formatKey, setFormatKey] = useState(group.formatKey || "");
   const [topic, setTopic] = useState(group.topic || "");
   const [storageUrl, setStorageUrl] = useState("");
+  const [reactions, setReactions] = useState<Record<string, string>>(() => {
+    const s = (group.scores || {}) as Record<string, number>;
+    const r: Record<string, string> = {};
+    for (const k of ["likes", "comments", "saves", "subscribes", "sales"]) r[k] = s[k] ? String(s[k]) : "";
+    return r;
+  });
+  const [scoreSaved, setScoreSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  async function saveReactions() {
+    await fetch(`/api/posts/${group.id}/score`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reactions: Object.fromEntries(Object.entries(reactions).map(([k, v]) => [k, Number(v) || 0])) }),
+    });
+    setScoreSaved(true);
+    setTimeout(() => setScoreSaved(false), 2500);
+    onUpdate();
+  }
   const [charCounts, setCharCounts] = useState<Record<number, number>>({});
   const [comment, setComment] = useState("");
   const [regenerating, setRegenerating] = useState(false);
@@ -704,6 +722,25 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                   onSaved={onUpdate}
                 />
               )}
+
+              {/* E2: ввід реальних реакцій → бали → навчання генератора */}
+              <div className="border-t border-border/40 pt-3">
+                <label className="block text-xs font-medium text-fg-muted mb-2">📊 Результати (для навчання генератора)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([["likes", "👍 Лайки"], ["comments", "💬 Коменти"], ["saves", "🔖 Збереж."], ["subscribes", "➕ Підписки"], ["sales", "💰 Продажі"]] as [string, string][]).map(([k, lbl]) => (
+                    <div key={k}>
+                      <label className="block text-[10px] text-fg-subtle mb-0.5">{lbl}</label>
+                      <input type="number" min="0" className="input text-xs" value={reactions[k]} onChange={(e) => setReactions((p) => ({ ...p, [k]: e.target.value }))} placeholder="0" />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <button onClick={saveReactions} className="btn-ghost text-xs px-3 py-1">Зберегти бали</button>
+                  {scoreSaved && <span className="text-[11px] text-success">✓ Збережено</span>}
+                  {group.scores?.total ? <span className="text-[11px] text-fg-subtle ml-auto">Загальний бал: {group.scores.total}</span> : null}
+                </div>
+                <p className="text-[11px] text-fg-subtle mt-1">Введи реальні реакції поста → генератор вчиться, які хуки/структури працюють для цієї мережі.</p>
+              </div>
             </div>
           )}
         </div>
