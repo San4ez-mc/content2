@@ -63,7 +63,6 @@ export default async function HomePage({
     include: {
       items: { orderBy: { orderIndex: "asc" } },
       socialNetwork: true,
-      category: true,
       persona: true,
     },
     orderBy: { postDate: "asc" },
