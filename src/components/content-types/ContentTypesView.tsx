@@ -59,12 +59,12 @@ export function ContentTypesView({ projectId }: Props) {
 
   const { data: types = [], isLoading } = useQuery<ContentType[]>({
     queryKey: ["contentTypes", projectId],
-    queryFn: () => fetch(`/api/content-types?projectId=${projectId}`).then((r) => r.json()),
+    queryFn: () => fetch(`/api/structures?projectId=${projectId}`).then((r) => r.json()),
     staleTime: 30_000,
   });
 
   async function toggleActive(type: ContentType) {
-    await fetch(`/api/content-types/${type.id}`, {
+    await fetch(`/api/structures/${type.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !type.isActive }),
@@ -74,7 +74,7 @@ export function ContentTypesView({ projectId }: Props) {
 
   async function deleteType(id: string) {
     if (!confirm("Видалити структуру?")) return;
-    await fetch(`/api/content-types/${id}`, { method: "DELETE" });
+    await fetch(`/api/structures/${id}`, { method: "DELETE" });
     queryClient.invalidateQueries({ queryKey: ["contentTypes", projectId] });
   }
 
@@ -227,7 +227,7 @@ function ContentTypeModal({ projectId, initial, onClose, onSaved }: {
     setError("");
     try {
       const body = { projectId, name, description: description || null, prompt, tone: tone || null, structure: structure || null, platforms, postTypes, rules: rules || null };
-      const url = initial ? `/api/content-types/${initial.id}` : "/api/content-types";
+      const url = initial ? `/api/structures/${initial.id}` : "/api/structures";
       const method = initial ? "PATCH" : "POST";
       const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await r.json();

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const gate = await requireProjectAccess(projectId);
   if (isGateError(gate)) return gate.error;
 
-  const types = await prisma.contentType.findMany({
+  const types = await prisma.structure.findMany({
     where: { projectId: projectId! },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name required" }, { status: 400 });
   }
 
-  const type = await prisma.contentType.create({
+  const type = await prisma.structure.create({
     data: {
       projectId,
       name,

@@ -43,7 +43,7 @@ export const DEFAULT_NETWORK_RULES: Record<string, string> = {
 };
 
 export async function seedDefaultStructures(projectId: string): Promise<{ created: number; updated: number }> {
-  const existing = await prisma.contentType.findMany({ where: { projectId }, select: { id: true, skeletonKey: true, name: true } });
+  const existing = await prisma.structure.findMany({ where: { projectId }, select: { id: true, skeletonKey: true, name: true } });
   const byKey = new Map(existing.filter((e) => e.skeletonKey).map((e) => [e.skeletonKey as string, e.id]));
   const byName = new Map(existing.map((e) => [e.name.toLowerCase().trim(), e.id]));
   let created = 0, updated = 0;
@@ -55,8 +55,8 @@ export async function seedDefaultStructures(projectId: string): Promise<{ create
       rules: s.rules ?? null, sortOrder: i,
     };
     const id = byKey.get(s.key) || byName.get(s.name.toLowerCase().trim());
-    if (id) { await prisma.contentType.update({ where: { id }, data }); updated++; }
-    else { await prisma.contentType.create({ data: { projectId, prompt: "", ...data } }); created++; }
+    if (id) { await prisma.structure.update({ where: { id }, data }); updated++; }
+    else { await prisma.structure.create({ data: { projectId, prompt: "", ...data } }); created++; }
   }
   return { created, updated };
 }

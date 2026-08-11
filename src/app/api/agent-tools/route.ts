@@ -517,7 +517,7 @@ async function getTopics(projectId: string, params: Record<string, unknown>) {
 // (структура доступна мережі, якщо її platforms порожні або містять цю мережу).
 async function getStructures(projectId: string, params: Record<string, unknown> = {}) {
   const platform = params.platform ? String(params.platform) : "";
-  let types = await prisma.contentType.findMany({ where: { projectId, isActive: true }, orderBy: [{ sortOrder: "asc" }] });
+  let types = await prisma.structure.findMany({ where: { projectId, isActive: true }, orderBy: [{ sortOrder: "asc" }] });
   if (platform) types = types.filter((t) => { const pl = Array.isArray(t.platforms) ? (t.platforms as string[]) : []; return pl.length === 0 || pl.includes(platform); });
   const arr = (v: any) => (Array.isArray(v) ? (v as string[]) : []);
   const text = types.map((t) => {
@@ -557,7 +557,7 @@ async function getFormats(projectId: string, params: Record<string, unknown> = {
 
 // Дозволені skeletonKey проєкту (для валідації structureId з генератора).
 async function validStructureKeys(projectId: string): Promise<Set<string>> {
-  const rows = await prisma.contentType.findMany({ where: { projectId, isActive: true, skeletonKey: { not: null } }, select: { skeletonKey: true } });
+  const rows = await prisma.structure.findMany({ where: { projectId, isActive: true, skeletonKey: { not: null } }, select: { skeletonKey: true } });
   return new Set(rows.map((r) => r.skeletonKey as string));
 }
 
