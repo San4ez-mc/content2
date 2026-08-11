@@ -8,7 +8,7 @@ type Ctx = { params: { id: string } };
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const group = await prisma.postGroup.findUnique({
     where: { id: params.id },
-    include: { items: { orderBy: { orderIndex: "asc" } }, socialNetwork: true, category: true, persona: true },
+    include: { items: { orderBy: { orderIndex: "asc" } }, socialNetwork: true, persona: true },
   });
 
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (denied) return denied;
 
   const body = await req.json();
-  const { status, audience, scheduleTime, categoryId, personaId, postDate, items, formatKey, topic,
+  const { status, audience, scheduleTime, personaId, postDate, items, formatKey, topic,
     intent, structureId, evidenceType, hookA, hookB, hookSelected, cta } = body; // #248 конструктор
 
   // Update group fields
@@ -34,7 +34,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       ...(status !== undefined && { status }),
       ...(audience !== undefined && { audience }),
       ...(scheduleTime !== undefined && { scheduleTime }),
-      ...(categoryId !== undefined && { categoryId }),
       ...(personaId !== undefined && { personaId }),
       ...(postDate !== undefined && { postDate: new Date(postDate) }),
       // #248 атоми конструктора

@@ -43,7 +43,6 @@ model Project {
   projectUsers     ProjectUser[]
   socialNetworks   SocialNetwork[]
   formats          Format[]
-  categories       Category[]
   personas         Persona[]
   postGroups       PostGroup[]
   chatSessions     ChatSession[]
@@ -107,26 +106,10 @@ model SocialNetwork {
   rules      String?     @db.Text // правила саме цієї мережі (тон, довжина, хештеги, лінки, алгоритм)
   linkPlacement String?  @map("link_placement") // куди йде CTA-лінк: comment | inline | bio | description
   project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  categories Category[]
   postGroups PostGroup[]
   formats    Format[]
 
   @@map("social_networks")
-}
-
-model Category {
-  id              String        @id @default(cuid())
-  projectId       String        @map("project_id")
-  socialNetworkId String        @map("social_network_id")
-  name            String
-  color           String?
-  description     String?
-  clientType      String?       @map("client_type") // TYPE_1, TYPE_2, TYPE_3
-  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
-  postGroups      PostGroup[]
-
-  @@map("categories")
 }
 
 model Persona {
@@ -155,7 +138,6 @@ model PostGroup {
   number          Int           @unique @default(autoincrement())
   projectId       String        @map("project_id")
   socialNetworkId String        @map("social_network_id")
-  categoryId      String?       @map("category_id")
   personaId       String?       @map("persona_id")
   postDate        DateTime      @map("post_date") @db.Date
   type            PostGroupType @default(single)
@@ -181,7 +163,6 @@ model PostGroup {
   updatedAt       DateTime      @updatedAt @map("updated_at")
   project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
-  category        Category?     @relation(fields: [categoryId], references: [id])
   persona         Persona?      @relation(fields: [personaId], references: [id])
   items           PostItem[]
   notifications   Notification[]

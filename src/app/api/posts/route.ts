@@ -15,7 +15,6 @@ export async function GET(req: NextRequest) {
   const include = {
     items: { orderBy: { orderIndex: "asc" as const } },
     socialNetwork: true,
-    category: true,
     persona: true,
   };
 
@@ -56,7 +55,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { projectId, socialNetworkId, postDate, type, status, content, categoryId, personaId, scheduleTime } = body;
+  const { projectId, socialNetworkId, postDate, type, status, content, personaId, scheduleTime } = body;
   const gate = await requireProjectAccess(projectId);
   if (isGateError(gate)) return gate.error;
 
@@ -67,7 +66,6 @@ export async function POST(req: NextRequest) {
       postDate: new Date(postDate),
       type: type || "single",
       status: status || "draft",
-      ...(categoryId && { categoryId }),
       ...(personaId && { personaId }),
       ...(scheduleTime && { scheduleTime }),
       items: {
