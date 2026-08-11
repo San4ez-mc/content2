@@ -34,19 +34,6 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
   const [scheduleTime, setScheduleTime] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Load categories for selected network
-  const { data: categories = [] } = useQuery<any[]>({
-    queryKey: ["categories", projectId],
-    queryFn: () => fetch(`/api/categories?projectId=${projectId}`).then((r) => r.json()),
-    staleTime: 60_000,
-  });
-
-  const networkCategories = categories.filter(
-    (c: any) => c.socialNetworkId === networkId
-  );
-
-  const [categoryId, setCategoryId] = useState("");
-
   const selectedNetwork = socialNetworks.find((n) => n.id === networkId);
 
   const displayDate = formatDate(new Date(date + "T12:00:00"));
@@ -64,7 +51,6 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
           type,
           status,
           content,
-          categoryId: categoryId || undefined,
           scheduleTime: scheduleTime || undefined,
         }),
       });
@@ -87,7 +73,6 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
           postDate: date,
           type,
           prompt: content,
-          categoryId: categoryId || undefined,
         }),
       });
       onCreated();
@@ -172,31 +157,13 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
             />
           </div>
 
-          {/* Category + Status row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-fg-muted mb-1.5">Категорія</label>
-              <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                <option value="">Без категорії</option>
-                {networkCategories.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                {networkCategories.length === 0 && categories.length > 0 && (
-                  <optgroup label="Інші">
-                    {categories.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-fg-muted mb-1.5">Статус</label>
-              <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="draft">Чернетка</option>
-                <option value="scheduled">Заплановано</option>
-              </select>
-            </div>
+          {/* Status */}
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1.5">Статус</label>
+            <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="draft">Чернетка</option>
+              <option value="scheduled">Заплановано</option>
+            </select>
           </div>
 
           {/* Schedule time (shown when scheduled) */}

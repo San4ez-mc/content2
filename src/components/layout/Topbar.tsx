@@ -13,9 +13,6 @@ const NAV = [
   { href: "/products", label: "Продукти" },
   { href: "/personas", label: "Персони" },
   { href: "/lead-magnets", label: "Лід-магніти" },
-  // Категорії приховано: у новій структурі їх замінили рубрики (ContentTopic.rubric).
-  // Сторінка /categories лишається доступною за URL; дані не втрачено.
-  // { href: "/categories", label: "Категорії" },
   { href: "/topics", label: "Теми" },
   { href: "/storage", label: "Сховище" },
   { href: "/structures", label: "Структури" },

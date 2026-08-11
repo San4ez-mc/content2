@@ -85,7 +85,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [postDate, setPostDate] = useState(group.postDate.slice(0, 10));
   const [audience, setAudience] = useState(group.audience || "");
   const [scheduleTime, setScheduleTime] = useState(group.scheduleTime || "");
-  const [categoryId, setCategoryId] = useState(group.categoryId || "");
   const [personaId, setPersonaId] = useState(group.personaId || "");
   const [formatKey, setFormatKey] = useState(group.formatKey || "");
   const [topic, setTopic] = useState(group.topic || "");
@@ -97,13 +96,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [regenMsg, setRegenMsg] = useState("");
 
   const pid = projectId || "";
-
-  const { data: categories = [] } = useQuery<any[]>({
-    queryKey: ["categories", pid],
-    queryFn: () => fetch(`/api/categories?projectId=${pid}`).then((r) => r.json()),
-    enabled: !!pid && activeTab === "settings",
-    staleTime: 60_000,
-  });
 
   const { data: formats = [] } = useQuery<any[]>({
     queryKey: ["formats", group.socialNetwork.id],
@@ -143,7 +135,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
           postDate: postDate || undefined,
           audience: audience || null,
           scheduleTime: scheduleTime || null,
-          categoryId: categoryId || null,
           personaId: personaId || null,
           formatKey: formatKey || null,
           topic: topic || null,
@@ -290,21 +281,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 className="text-xs text-fg-muted bg-transparent border-b border-dashed border-border hover:border-accent focus:border-accent focus:outline-none cursor-pointer"
                 title="Натисніть щоб змінити дату"
               />
-              {group.category && (
-                <>
-                  <span className="text-xs text-fg-subtle">·</span>
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                    style={{
-                      backgroundColor: (group.category.color || "#64748b") + "22",
-                      color: group.category.color || "#64748b"
-                    }}
-                    title="Категорія, обрана при створенні"
-                  >
-                    {group.category.name}
-                  </span>
-                </>
-              )}
               {/* #244 Тема (намір) створення */}
               {group.intent && INTENT_LABELS[group.intent] && (
                 <>
@@ -659,22 +635,6 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </p>
               </div>
 
-              {categories.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-fg-muted mb-1.5">📁 Категорія</label>
-                  <select
-                    className="input"
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                  >
-                    <option value="">Без категорії</option>
-                    {categories.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {formats.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-fg-muted mb-1.5">🧩 Формат</label>
@@ -725,10 +685,10 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
                 </div>
               )}
 
-              {(categories.length === 0 && personas.length === 0) && (
+              {personas.length === 0 && (
                 <div className="text-xs text-fg-muted text-center py-4 bg-border/10 rounded-xl border border-dashed border-border">
-                  Категорій та персонажів ще немає.{" "}
-                  <a href="/categories" className="text-accent hover:underline">Створіть їх →</a>
+                  Персон ще немає.{" "}
+                  <a href="/personas" className="text-accent hover:underline">Створіть їх →</a>
                 </div>
               )}
 

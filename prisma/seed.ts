@@ -43,35 +43,6 @@ async function main() {
       netByPlatform.set(net.platformKey, created.id);
     }
 
-    // #313 Дефолтні категорії (рубрики) при створенні проєкту — маплячи на соцмережі.
-    const defaultCategories: { platform: string; name: string }[] = [
-      { platform: "threads", name: "Ситуація з практики" },
-      { platform: "threads", name: "Корисний факт" },
-      { platform: "threads", name: "Питання до аудиторії" },
-      { platform: "threads", name: "Кейс з практики" },
-      { platform: "threads", name: "Легка провокація" },
-      { platform: "threads", name: "Лід-магніт" },
-      { platform: "instagram_posts", name: "Розгорнутий кейс" },
-      { platform: "instagram_posts", name: "Особиста історія автора" },
-      { platform: "instagram_posts", name: "Практичний інструмент" },
-      { platform: "instagram_posts", name: "Продажний пост / анонс" },
-      { platform: "instagram_posts", name: "Біль власника" },
-      { platform: "instagram_stories", name: "Сторіз — анонс рілсу" },
-      { platform: "instagram_stories", name: "Сторіз — питання" },
-      { platform: "instagram_reels", name: "Рілс — кейс" },
-      { platform: "instagram_reels", name: "Рілс — лайфхак" },
-      { platform: "linkedin", name: "Кейс з цифрами" },
-      { platform: "linkedin", name: "Експертна думка" },
-      { platform: "linkedin", name: "Продажний пост" },
-      { platform: "tiktok", name: "Кейс з практики" },
-      { platform: "tiktok", name: "Автоматизація і ШІ" },
-    ];
-    for (const cat of defaultCategories) {
-      const socialNetworkId = netByPlatform.get(cat.platform);
-      if (!socialNetworkId) continue;
-      await prisma.category.create({ data: { projectId: project.id, socialNetworkId, name: cat.name, color: "#5a6c7d" } });
-    }
-
     // Default schedule (09:00, 12:00, 18:00 every weekday)
     const times = ["09:00", "12:00", "18:00"];
     await prisma.scheduleSettings.create({
