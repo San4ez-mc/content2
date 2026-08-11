@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 const NAV = [
   { href: "/", label: "Контент" },
   { href: "/products", label: "Продукти" },
+  { href: "/personas", label: "Персони" },
   { href: "/lead-magnets", label: "Лід-магніти" },
   // Категорії приховано: у новій структурі їх замінили рубрики (ContentTopic.rubric).
   // Сторінка /categories лишається доступною за URL; дані не втрачено.

@@ -18,12 +18,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { projectId, name, age, gender, type, pains, goals, tone, forbiddenWords } = body;
+  const { projectId, name, age, gender, type, pains, goals, tone, forbiddenWords, triggers, objections, language } = body;
   const gate = await requireProjectAccess(projectId);
   if (isGateError(gate)) return gate.error;
 
   const persona = await prisma.persona.create({
-    data: { projectId, name, age, gender, type, pains, goals, tone, forbiddenWords },
+    data: { projectId, name, age, gender, type, pains, goals, tone, forbiddenWords, triggers, objections, language },
   });
 
   return NextResponse.json(persona);
