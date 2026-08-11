@@ -104,7 +104,7 @@ export function QuickCreateModal({ date, projectId, socialNetworks, onClose, onC
               {socialNetworks.map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => { setNetworkId(n.id); setCategoryId(""); }}
+                  onClick={() => setNetworkId(n.id)}
                   className={cn(
                     "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
                     networkId === n.id
