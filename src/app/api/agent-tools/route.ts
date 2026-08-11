@@ -73,6 +73,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_structures": return await getStructures(projectId, params);
       case "get_network_rules": return await getNetworkRules(projectId, params);
       case "get_formats": return await getFormats(projectId, params);
+      case "get_top_patterns": return await getTopPatterns(projectId, params);
       case "get_products": return await getProducts(projectId);
       case "get_lead_magnets": return await getLeadMagnets(projectId, params);
       case "mark_topics_used": return await markTopicsUsed(projectId, params);
@@ -553,6 +554,44 @@ async function getFormats(projectId: string, params: Record<string, unknown> = {
     return `• ${netById.get(f.socialNetworkId)} → ${f.key} (${f.name}) [aspect ${f.aspect || "-"}; медіа: ${mt}]`;
   }).join("\n");
   return NextResponse.json({ ok: true, count: formats.length, text, formats: formats.map((f) => ({ platform: netById.get(f.socialNetworkId), key: f.key, name: f.name, mediaTypes: f.mediaTypes, aspect: f.aspect })) });
+}
+
+// E2 скоринг: що працює найкраще (з реальних балів реакцій) — по атомах, опційно по мережі.
+// Віддає генератору підказку «для LinkedIn краще hook=stat». Поріг вибірки MIN_PATTERN_SAMPLE.
+const MIN_PATTERN_SAMPLE = 3;
+async function getTopPatterns(projectId: string, params: Record<string, unknown> = {}) {
+  const platform = params.platform ? String(params.platform) : "";
+  const groups = await prisma.postGroup.findMany({
+    where: { projectId, ...(platform ? { socialNetwork: { platformKey: platform } } : {}) },
+    select: { intent: true, structureId: true, hookSelected: true, evidenceType: true, scores: true },
+  });
+  const elements: Record<string, string> = { intent: "intent", structure: "structureId", hook: "hookSelected", evidence: "evidenceType" };
+  const acc: Record<string, Record<string, { sum: number; n: number }>> = { intent: {}, structure: {}, hook: {}, evidence: {} };
+  let scored = 0;
+  for (const g of groups) {
+    const sc = g.scores as any;
+    const total = sc && typeof sc === "object" && typeof sc.total === "number" ? sc.total : null;
+    if (total == null || total === 0) continue;
+    scored++;
+    for (const [label, field] of Object.entries(elements)) {
+      const v = (g as any)[field] as string | null;
+      if (!v) continue;
+      const b = (acc[label][v] ||= { sum: 0, n: 0 });
+      b.sum += total; b.n += 1;
+    }
+  }
+  const best: string[] = [];
+  for (const [label, vals] of Object.entries(acc)) {
+    let top: { v: string; avg: number; n: number } | null = null;
+    for (const [v, b] of Object.entries(vals)) {
+      if (b.n < MIN_PATTERN_SAMPLE) continue;
+      const avg = b.sum / b.n;
+      if (!top || avg > top.avg) top = { v, avg: Math.round(avg * 10) / 10, n: b.n };
+    }
+    if (top) best.push(`${label}=${top.v} (бал ${top.avg}, n=${top.n})`);
+  }
+  const text = best.length ? `Що працює найкраще${platform ? " для " + platform : ""} (з реальних результатів): ${best.join("; ")}. Віддавай перевагу цим елементам, якщо доречно темі.` : "";
+  return NextResponse.json({ ok: true, text, scoredPosts: scored });
 }
 
 // Дозволені skeletonKey проєкту (для валідації structureId з генератора).
