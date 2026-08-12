@@ -263,6 +263,10 @@ async function editPost(projectId: string, params: Record<string, unknown>) {
   const newContent = params.text ?? params.content;
   if (newContent != null && g.items[0]) {
     await prisma.postItem.update({ where: { id: g.items[0].id }, data: { content: String(newContent) } });
+    // E3 двофазність: наповнення скелета текстом «випускає» його в графік.
+    if ((g as any).skeleton) {
+      await prisma.postGroup.update({ where: { id: g.id }, data: { skeleton: false, ...(groupData.status ? {} : { status: "scheduled" }) } });
+    }
   }
   broadcastToProject(projectId, { type: "post_updated", source: "agent" });
   return NextResponse.json({ ok: true, number: g.number });

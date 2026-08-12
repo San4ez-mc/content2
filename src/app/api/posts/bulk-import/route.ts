@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { projectId, posts, deliverTo } = body;
+  const skeletonMode = body.skeleton === true; // E3: план-скелети без текстів/медіа
 
   if (!projectId || !Array.isArray(posts) || posts.length === 0) {
     return NextResponse.json({ error: "projectId and posts required" }, { status: 400 });
@@ -97,7 +98,8 @@ export async function POST(req: NextRequest) {
     }
     // C3 батч-критик: пост із порушеннями стандарту письма НЕ йде в графік —
     // тримаємо як draft (на перевірку), а не «scheduled» (авто-публікація).
-    const groupStatus = scanWriting(String(p.content || "")).length > 0 ? "draft" : "scheduled";
+    // Скелет — завжди draft (текст напишеться на фазі J-2); інакше critic вирішує.
+    const groupStatus = skeletonMode ? "draft" : (scanWriting(String(p.content || "")).length > 0 ? "draft" : "scheduled");
 
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;
@@ -106,8 +108,8 @@ export async function POST(req: NextRequest) {
     // Backward compat: if no funnel_slug but has media_type, derive funnel_slug
     const derivedFunnelSlug = funnelSlug || deriveSlugFromMediaType(p.media_type);
 
-    // Determine if image generation is needed
-    const needsGeneration = Boolean(derivedFunnelSlug && derivedFunnelSlug !== "text_only");
+    // Determine if image generation is needed (скелети медіа не генерують).
+    const needsGeneration = !skeletonMode && Boolean(derivedFunnelSlug && derivedFunnelSlug !== "text_only");
 
     const itemData = {
       content: p.content || "",
@@ -153,6 +155,7 @@ export async function POST(req: NextRequest) {
           type: postType as any,
           formatKey,
           audience,
+          skeleton: skeletonMode,
           ...atomData,
           status: groupStatus as any,
           items: { create: [{ orderIndex: 0, ...itemData }] },
