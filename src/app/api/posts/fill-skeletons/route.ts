@@ -32,7 +32,7 @@ async function handle(req: NextRequest) {
   const today = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
   let sent = 0;
 
-  for (const [projectId, list] of byProject) {
+  for (const [projectId, list] of Array.from(byProject.entries())) {
     const lines = list.map((s) =>
       `#${s.number} (${s.socialNetwork.platformKey}, формат ${s.formatKey || "post"}${s.structureId ? ", структура " + s.structureId : ""}, дата ${s.postDate.toISOString().slice(0, 10)}, тема «${s.topic || "—"}»)`
     ).join("; ");
