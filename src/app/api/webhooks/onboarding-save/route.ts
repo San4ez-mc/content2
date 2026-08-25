@@ -5,7 +5,8 @@ import { seedDefaultStructures } from "@/lib/seedStructures";
 
 // Викликається онбординг-воронками flows (Агент A). Пише артефакт у content2.
 // Ключові принципи: (1) таргетинг проєкту по projectId (не плодимо дублі);
-// (2) ДОПИСУЄМО, не заміняємо — дедуп за назвою/заголовком.
+// (2) ДОПИСУЄМО, не заміняємо — дедуп за назвою/заголовком (окрім kind=founder — 1:1 upsert).
+// kind: product|persona|case|strategy|leadmagnet|brand|topics|products|doc|founder.
 // Auth: заголовок x-webhook-secret === WEBHOOK_SECRET.
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-webhook-secret");
@@ -118,12 +119,21 @@ export async function POST(req: NextRequest) {
         ? await prisma.leadMagnet.update({ where: { id: existing.id }, data: fields })
         : await prisma.leadMagnet.create({ data: { projectId: pid, productId: productRec.id, name: String(data.name || "Лід-магніт"), ...fields } });
     } else if (kind === "topics") {
-      // ~50 тем від ШІ → банк тем (status=idea). Дедуп за title. data.topics: [{rubric,title,notes?}]
+      // ~50 тем від ШІ → банк тем (status=idea). Дедуп за title. data.topics: [{rubric,title,notes?,contentType?,cyclePosition?}]
+      // contentType (7 типів з методології маркетолога) і cyclePosition («7 дотиків») — опційні,
+      // окремі від наявного rubric, не заміняють його. Валідні значення — м'яко нормалізуємо,
+      // невідоме → null (не блокуємо запис через незнайомий варіант від ШІ).
+      const CONTENT_TYPES = new Set(["engagement", "pain", "benefit", "objection", "testimonial", "lifestyle", "entertainment"]);
+      const CYCLE_POSITIONS = new Set(["pain", "hope", "objection", "desire", "benefit", "super_benefit"]);
       const items: any[] = Array.isArray(data.topics) ? data.topics : Array.isArray(data) ? data : [];
       const existing = new Set((await prisma.contentTopic.findMany({ where: { projectId: pid }, select: { title: true } })).map((t) => t.title.toLowerCase().trim()));
       const toCreate = items
         .filter((t) => t?.title && !existing.has(String(t.title).toLowerCase().trim()))
-        .map((t) => ({ projectId: pid, rubric: String(t.rubric || "galuzi"), title: String(t.title), notes: t.notes ? String(t.notes) : null, status: "idea" }));
+        .map((t) => ({
+          projectId: pid, rubric: String(t.rubric || "galuzi"), title: String(t.title), notes: t.notes ? String(t.notes) : null, status: "idea",
+          contentType: CONTENT_TYPES.has(String(t.contentType || "")) ? String(t.contentType) : null,
+          cyclePosition: CYCLE_POSITIONS.has(String(t.cyclePosition || "")) ? String(t.cyclePosition) : null,
+        }));
       const res = toCreate.length ? await prisma.contentTopic.createMany({ data: toCreate, skipDuplicates: true }) : { count: 0 };
       saved = { created: res.count, received: items.length };
     } else if (kind === "strategy") {
@@ -144,6 +154,30 @@ export async function POST(req: NextRequest) {
       saved = existing
         ? await prisma.knowledgeEntry.update({ where: { id: existing.id }, data: { content, isActive: true } })
         : await prisma.knowledgeEntry.create({ data: { projectId: pid, category: "onboarding-doc", title, content, addedBy: "bot" } });
+    } else if (kind === "founder") {
+      // Профіль засновника — 1:1 до проєкту (upsert, не дедуп за назвою). Масиви приймаємо
+      // як є (strengths/differentiators/selfPresentation); LLM іноді шле рядок замість
+      // масиву — тоді загортаємо в один елемент.
+      const A = (v: any): any[] | undefined =>
+        v == null ? undefined : Array.isArray(v) ? v : [v];
+      const fields = {
+        core: S(data.core),
+        strengths: A(data.strengths) ?? undefined,
+        interactionStyle: S(data.interactionStyle),
+        differentiators: A(data.differentiators) ?? undefined,
+        selfPresentation: A(data.selfPresentation) ?? undefined,
+        archetypePrimary: S(data.archetypePrimary),
+        archetypeSecondary: S(data.archetypeSecondary),
+        archetypeDirection: S(data.archetypeDirection),
+        archetypeReasoning: S(data.archetypeReasoning),
+      };
+      // Прибираємо undefined-поля, щоб upsert не перетирав уже збережене порожнім значенням.
+      const cleanFields = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      saved = await prisma.founderProfile.upsert({
+        where: { projectId: pid },
+        create: { projectId: pid, ...cleanFields },
+        update: cleanFields,
+      });
     } else if (kind === "brand") {
       const title = String(data.title || "Бренд і Tone of Voice");
       const content = String(data.content || "");
@@ -167,6 +201,7 @@ export async function POST(req: NextRequest) {
     product: `${BASE}/products`, products: `${BASE}/products`, leadmagnet: `${BASE}/lead-magnets`,
     topics: `${BASE}/topics`, persona: `${BASE}/user-data`, case: `${BASE}/user-data`,
     strategy: `${BASE}/user-data`, brand: `${BASE}/user-data`, doc: `${BASE}/storage`,
+    founder: `${BASE}/founder`,
   };
   const viewUrl = viewUrlByKind[kind] || `${BASE}/user-data`;
 

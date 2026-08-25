@@ -10,12 +10,12 @@ datasource db {
 // ─── Auth ───────────────────────────────────────────────
 
 model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
-  passwordHash  String        @map("password_hash")
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
   name          String
-  role          UserRole      @default(client)
-  createdAt     DateTime      @default(now()) @map("created_at")
+  role          UserRole       @default(client)
+  createdAt     DateTime       @default(now()) @map("created_at")
   projectUsers  ProjectUser[]
   chatSessions  ChatSession[]
   notifications Notification[]
@@ -44,6 +44,7 @@ model Project {
   socialNetworks   SocialNetwork[]
   formats          Format[]
   personas         Persona[]
+  founderProfile   FounderProfile?
   postGroups       PostGroup[]
   chatSessions     ChatSession[]
   notifications    Notification[]
@@ -77,17 +78,17 @@ enum ProjectRole {
 }
 
 model Invitation {
-  id        String    @id @default(cuid())
+  id        String      @id @default(cuid())
   email     String
-  projectId String    @map("project_id")
-  token     String    @unique
+  projectId String      @map("project_id")
+  token     String      @unique
   role      ProjectRole @default(editor)
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdBy String    @map("created_by")
-  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  creator   User      @relation(fields: [createdBy], references: [id])
-  createdAt DateTime  @default(now()) @map("created_at")
+  expiresAt DateTime    @map("expires_at")
+  usedAt    DateTime?   @map("used_at")
+  createdBy String      @map("created_by")
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator   User        @relation(fields: [createdBy], references: [id])
+  createdAt DateTime    @default(now()) @map("created_at")
 
   @@map("invitations")
 }
@@ -95,19 +96,19 @@ model Invitation {
 // ─── Content ────────────────────────────────────────────
 
 model SocialNetwork {
-  id         String      @id @default(cuid())
-  projectId  String      @map("project_id")
-  name       String
-  platformKey String     @map("platform_key") // instagram_posts, threads, linkedin...
-  icon       String?
-  color      String?     // hex
-  isEnabled  Boolean     @default(true) @map("is_enabled")
-  sortOrder  Int         @default(0) @map("sort_order")
-  rules      String?     @db.Text // правила саме цієї мережі (тон, довжина, хештеги, лінки, алгоритм)
-  linkPlacement String?  @map("link_placement") // куди йде CTA-лінк: comment | inline | bio | description
-  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  postGroups PostGroup[]
-  formats    Format[]
+  id            String      @id @default(cuid())
+  projectId     String      @map("project_id")
+  name          String
+  platformKey   String      @map("platform_key") // instagram_posts, threads, linkedin...
+  icon          String?
+  color         String? // hex
+  isEnabled     Boolean     @default(true) @map("is_enabled")
+  sortOrder     Int         @default(0) @map("sort_order")
+  rules         String?     @db.Text // правила саме цієї мережі (тон, довжина, хештеги, лінки, алгоритм)
+  linkPlacement String?     @map("link_placement") // куди йде CTA-лінк: comment | inline | bio | description
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  postGroups    PostGroup[]
+  formats       Format[]
 
   @@map("social_networks")
 }
@@ -118,7 +119,7 @@ model Persona {
   name           String
   age            Int?
   gender         String?
-  type           String?     // TYPE_1, TYPE_2, TYPE_3
+  type           String? // TYPE_1, TYPE_2, TYPE_3
   pains          String?     @db.Text
   goals          String?     @db.Text
   tone           String?
@@ -133,39 +134,61 @@ model Persona {
   @@map("personas")
 }
 
+// Профіль ЗАСНОВНИКА/експерта — окремо від Persona (ЦА). Відповідає на «хто говорить»,
+// а не «до кого говоримо». Джерело методології — «Коуч з розпаковки» + «Гайд по архетипах»
+// (онбординг-архітектура.md §3 Етап 0.5, §5). 1:1 до проєкту.
+model FounderProfile {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique @map("project_id")
+  core               String?  @db.Text // ядро експерта: хто це, через що викликає довіру
+  strengths          Json     @default("[]") // масив рядків, формат дії: "я вмію..."
+  interactionStyle   String?  @map("interaction_style") @db.Text // як працює з клієнтом, що люди відчувають поруч
+  differentiators    Json     @default("[]") // масив 3-5 тез відмінності від інших
+  selfPresentation   Json     @default("[]") // [{length:"short"|"medium"|"live", text}] — 2-3 варіанти самопрезентації
+  archetypePrimary   String?  @map("archetype_primary") // головний ведучий архетип (з 12)
+  archetypeSecondary String?  @map("archetype_secondary") // архетип-підсилювач/альтернативний близький
+  archetypeDirection String?  @map("archetype_direction") // напрям: authority|trust|distinction|depth
+  archetypeReasoning String?  @map("archetype_reasoning") @db.Text // чому саме такий висновок (спосіб впливу, маркери)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("founder_profiles")
+}
+
 model PostGroup {
-  id              String        @id @default(cuid())
-  number          Int           @unique @default(autoincrement())
-  projectId       String        @map("project_id")
-  socialNetworkId String        @map("social_network_id")
-  personaId       String?       @map("persona_id")
-  postDate        DateTime      @map("post_date") @db.Date
-  type            PostGroupType @default(single)
-  formatKey       String?       @map("format_key") // уніфікований формат: post|story|reel|carousel|thread|short|slideshow
-  topic           String?       @db.Text // тема поста (used_topic від генератора; можна змінити й перегенерувати)
-  audience        String?       // cold, warm1, warm2, hot1, hot2
-  status          PostStatus    @default(draft)
-  scheduleTime    String?       @map("schedule_time") // "09:00"
+  id               String            @id @default(cuid())
+  number           Int               @unique @default(autoincrement())
+  projectId        String            @map("project_id")
+  socialNetworkId  String            @map("social_network_id")
+  personaId        String?           @map("persona_id")
+  postDate         DateTime          @map("post_date") @db.Date
+  type             PostGroupType     @default(single)
+  formatKey        String?           @map("format_key") // уніфікований формат: post|story|reel|carousel|thread|short|slideshow
+  topic            String?           @db.Text // тема поста (used_topic від генератора; можна змінити й перегенерувати)
+  audience         String? // cold, warm1, warm2, hot1, hot2
+  status           PostStatus        @default(draft)
+  scheduleTime     String?           @map("schedule_time") // "09:00"
   // Ф3.1 (#305) strategic-атоми на рівні ЮНІТА (Варіант A); PostItem лишається render-шаром
-  hookA           String?       @map("hook_a") @db.Text
-  hookB           String?       @map("hook_b") @db.Text
-  hookSelected    String?       @map("hook_selected")
-  cta             String?       @db.Text
-  structureId     String?       @map("structure_id")
-  evidenceType    String?       @map("evidence_type") // case | example | story
-  caseId          String?       @map("case_id")
-  scores          Json          @default("{}")
-  arcId           String?       @map("arc_id")
-  experimentId    String?       @map("experiment_id")
-  skeleton        Boolean       @default(false) // двофазна генерація: скелет без текстів
-  intent          String?       // Ф3.6 educate | sell | trust | storytelling | entertainment
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
-  persona         Persona?      @relation(fields: [personaId], references: [id])
-  items           PostItem[]
-  notifications   Notification[]
+  hookA            String?           @map("hook_a") @db.Text
+  hookB            String?           @map("hook_b") @db.Text
+  hookSelected     String?           @map("hook_selected")
+  cta              String?           @db.Text
+  structureId      String?           @map("structure_id")
+  evidenceType     String?           @map("evidence_type") // case | example | story
+  caseId           String?           @map("case_id")
+  scores           Json              @default("{}")
+  arcId            String?           @map("arc_id")
+  experimentId     String?           @map("experiment_id")
+  skeleton         Boolean           @default(false) // двофазна генерація: скелет без текстів
+  intent           String? // Ф3.6 educate | sell | trust | storytelling | entertainment
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  socialNetwork    SocialNetwork     @relation(fields: [socialNetworkId], references: [id])
+  persona          Persona?          @relation(fields: [personaId], references: [id])
+  items            PostItem[]
+  notifications    Notification[]
   publicationQueue PublicationQueue?
 
   @@index([projectId, postDate])
@@ -187,23 +210,23 @@ enum PostStatus {
 }
 
 model PostItem {
-  id               String            @id @default(cuid())
-  groupId          String            @map("group_id")
-  orderIndex       Int               @map("order_index") @default(0)
-  content          String?           @db.Text
-  imagePrompt      String?           @map("image_prompt") @db.Text
-  imagePath        String?           @map("image_path")
-  imageType        String?           @map("image_type") // flux, ideogram, recraft...
-  funnelSlug       String?           @map("funnel_slug")
-  funnelParams     Json?             @map("funnel_params")
-  generationStatus GenerationStatus  @default(pending) @map("generation_status")
-  generationError  String?           @map("generation_error") @db.Text
-  isCta            Boolean           @default(false) @map("is_cta")
-  slideTitle       String?           @map("slide_title")
-  slideSubtitle    String?           @map("slide_subtitle")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  group            PostGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id               String           @id @default(cuid())
+  groupId          String           @map("group_id")
+  orderIndex       Int              @default(0) @map("order_index")
+  content          String?          @db.Text
+  imagePrompt      String?          @map("image_prompt") @db.Text
+  imagePath        String?          @map("image_path")
+  imageType        String?          @map("image_type") // flux, ideogram, recraft...
+  funnelSlug       String?          @map("funnel_slug")
+  funnelParams     Json?            @map("funnel_params")
+  generationStatus GenerationStatus @default(pending) @map("generation_status")
+  generationError  String?          @map("generation_error") @db.Text
+  isCta            Boolean          @default(false) @map("is_cta")
+  slideTitle       String?          @map("slide_title")
+  slideSubtitle    String?          @map("slide_subtitle")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  group            PostGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId, orderIndex])
   @@map("post_items")
@@ -307,13 +330,13 @@ model PasswordResetToken {
 
 // Ф3.6 SMM-стратегія: content pillars + intent-квоти (версійована)
 model SmmStrategy {
-  id                  String   @id @default(cuid())
-  projectId           String   @map("project_id")
-  contentPillars      Json     @default("[]") @map("content_pillars")
-  intentDistribution  Json     @default("{}") @map("intent_distribution") // {educate:0.30, sell:0.20, ...}
-  version             Int      @default(1)
-  activeFrom          DateTime @default(now()) @map("active_from")
-  createdAt           DateTime @default(now()) @map("created_at")
+  id                 String   @id @default(cuid())
+  projectId          String   @map("project_id")
+  contentPillars     Json     @default("[]") @map("content_pillars")
+  intentDistribution Json     @default("{}") @map("intent_distribution") // {educate:0.30, sell:0.20, ...}
+  version            Int      @default(1)
+  activeFrom         DateTime @default(now()) @map("active_from")
+  createdAt          DateTime @default(now()) @map("created_at")
 
   @@index([projectId])
   @@map("smm_strategies")
@@ -341,16 +364,16 @@ enum GenerationStatus {
 // ─── Media ──────────────────────────────────────────────
 
 model MediaItem {
-  id           String   @id @default(cuid())
-  projectId    String   @map("project_id")
-  fileName     String   @map("file_name")
-  filePath     String   @map("file_path")
-  mimeType     String   @map("mime_type")
-  folder       String?
-  tags         Json?
-  aiGenerated  Boolean  @default(false) @map("ai_generated")
-  createdAt    DateTime @default(now()) @map("created_at")
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  fileName    String   @map("file_name")
+  filePath    String   @map("file_path")
+  mimeType    String   @map("mime_type")
+  folder      String?
+  tags        Json?
+  aiGenerated Boolean  @default(false) @map("ai_generated")
+  createdAt   DateTime @default(now()) @map("created_at")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("media_items")
 }
@@ -390,17 +413,17 @@ enum MessageRole {
 // ─── Notifications ──────────────────────────────────────
 
 model Notification {
-  id          String    @id @default(cuid())
-  projectId   String    @map("project_id")
-  userId      String    @map("user_id")
-  type        String    // generation_done, generation_failed, scheduled_reminder
+  id          String     @id @default(cuid())
+  projectId   String     @map("project_id")
+  userId      String     @map("user_id")
+  type        String // generation_done, generation_failed, scheduled_reminder
   title       String
-  body        String    @db.Text
-  postGroupId String?   @map("post_group_id")
-  readAt      DateTime? @map("read_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id])
+  body        String     @db.Text
+  postGroupId String?    @map("post_group_id")
+  readAt      DateTime?  @map("read_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id])
   postGroup   PostGroup? @relation(fields: [postGroupId], references: [id])
 
   @@index([userId, readAt])
@@ -410,22 +433,22 @@ model Notification {
 // ─── Schedule ───────────────────────────────────────────
 
 model ScheduleSettings {
-  id               String   @id @default(cuid())
-  projectId        String   @unique @map("project_id")
-  monday           Json     @default("[]")
-  tuesday          Json     @default("[]")
-  wednesday        Json     @default("[]")
-  thursday         Json     @default("[]")
-  friday           Json     @default("[]")
-  saturday         Json     @default("[]")
-  sunday           Json     @default("[]")
-  sendToTelegram   Boolean  @default(true) @map("send_to_telegram")
-  telegramChatId   String?  @map("telegram_chat_id")
-  digestTime       String?  @map("digest_time")
-  digestChatId     String?  @map("digest_chat_id")
-  lastDigestDate   String?  @map("last_digest_date")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  projectId      String   @unique @map("project_id")
+  monday         Json     @default("[]")
+  tuesday        Json     @default("[]")
+  wednesday      Json     @default("[]")
+  thursday       Json     @default("[]")
+  friday         Json     @default("[]")
+  saturday       Json     @default("[]")
+  sunday         Json     @default("[]")
+  sendToTelegram Boolean  @default(true) @map("send_to_telegram")
+  telegramChatId String?  @map("telegram_chat_id")
+  digestTime     String?  @map("digest_time")
+  digestChatId   String?  @map("digest_chat_id")
+  lastDigestDate String?  @map("last_digest_date")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("schedule_settings")
 }
@@ -454,19 +477,19 @@ model KnowledgeEntry {
 // Прив'язаний до мережі; декларує дозволені медіа-типи + aspect + відео-налаштування.
 // Per-project, засівається канонічним набором. Редагується на сторінці мережі.
 model Format {
-  id              String       @id @default(cuid())
-  projectId       String       @map("project_id")
-  socialNetworkId String       @map("social_network_id")
+  id              String        @id @default(cuid())
+  projectId       String        @map("project_id")
+  socialNetworkId String        @map("social_network_id")
   key             String // post | story | reel | carousel | thread | short | slideshow
   name            String
-  mediaTypes      Json         @default("[]") @map("media_types") // дозволені медіа-типи
-  aspect          String?      // 9:16 | 1:1 | 4:5 | 16:9
-  settings        Json         @default("{}") // відео/медіа-дефолти: subtitles, duration, music, thumbnail
-  sortOrder       Int          @default(0) @map("sort_order")
-  isActive        Boolean      @default(true) @map("is_active")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mediaTypes      Json          @default("[]") @map("media_types") // дозволені медіа-типи
+  aspect          String? // 9:16 | 1:1 | 4:5 | 16:9
+  settings        Json          @default("{}") // відео/медіа-дефолти: subtitles, duration, music, thumbnail
+  sortOrder       Int           @default(0) @map("sort_order")
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
@@ -481,7 +504,7 @@ model Structure {
   projectId   String   @map("project_id")
   name        String
   description String?  @db.Text
-  prompt      String   @db.Text @default("")
+  prompt      String   @default("") @db.Text
   tone        String?
   structure   String?  @db.Text
   platforms   Json     @default("[]") // мережі (platformKey[]): threads, instagram_posts, linkedin, telegram, tiktok
@@ -502,20 +525,22 @@ model Structure {
 
 // Банк тем: рубрика (напрямок) → тема → пост. Editable per-project in /topics.
 model ContentTopic {
-  id          String   @id @default(cuid())
-  projectId   String   @map("project_id")
-  rubric      String   // напрямок: galuzi|nuances|cases|theoretical|heroes|tools|personal
-  title       String   // конкретна тема
-  notes       String?  @db.Text
-  platforms   Json     @default("[]") // опційно: для яких мереж тема
-  status      String   @default("idea") // idea | planned | used
-  timesUsed   Int      @default(0) @map("times_used")
-  isActive    Boolean  @default(true) @map("is_active")
-  sortOrder   Int      @default(0) @map("sort_order")
-  lastUsedAt  DateTime? @map("last_used_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  projectId  String    @map("project_id")
+  rubric     String // напрямок: galuzi|nuances|cases|theoretical|heroes|tools|personal
+  title      String // конкретна тема
+  notes      String?   @db.Text
+  contentType String?  @map("content_type") // 7 типів з методології маркетолога: engagement|pain|benefit|objection|testimonial|lifestyle|entertainment
+  cyclePosition String? @map("cycle_position") // позиція в драматургії «7 дотиків»: pain|hope|objection|desire|benefit|super_benefit
+  platforms  Json      @default("[]") // опційно: для яких мереж тема
+  status     String    @default("idea") // idea | planned | used
+  timesUsed  Int       @default(0) @map("times_used")
+  isActive   Boolean   @default(true) @map("is_active")
+  sortOrder  Int       @default(0) @map("sort_order")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, status])
   @@map("content_topics")
@@ -524,23 +549,23 @@ model ContentTopic {
 // ─── Products & Lead Magnets ────────────────────────────
 // Продукти, які продаємо через соцмережі. Контент-план орієнтується на них.
 model Product {
-  id          String       @id @default(cuid())
-  projectId   String       @map("project_id")
-  name        String
-  description String?      @db.Text // що це, кому, ключова цінність — щоб контент вів до продажу
-  price       String?      // вільний текст: "2500 грн", "від $500", "за запитом"
-  audience    String?      @db.Text // для кого продукт (ЦА)
-  pains       String?      @db.Text // болі, які закриває (ШІ пропонує за методологією)
-  transformation String?   @db.Text // до/після — трансформація клієнта
-  benefits    String?      @db.Text // ключові переваги
-  priority    Int?         // пріоритет продукту (1 = головний)
-  isActive    Boolean      @default(true) @map("is_active")
-  sortOrder   Int          @default(0) @map("sort_order")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  leadMagnets LeadMagnet[]
-  cases       Case[]
+  id             String       @id @default(cuid())
+  projectId      String       @map("project_id")
+  name           String
+  description    String?      @db.Text // що це, кому, ключова цінність — щоб контент вів до продажу
+  price          String? // вільний текст: "2500 грн", "від $500", "за запитом"
+  audience       String?      @db.Text // для кого продукт (ЦА)
+  pains          String?      @db.Text // болі, які закриває (ШІ пропонує за методологією)
+  transformation String?      @db.Text // до/після — трансформація клієнта
+  benefits       String?      @db.Text // ключові переваги
+  priority       Int? // пріоритет продукту (1 = головний)
+  isActive       Boolean      @default(true) @map("is_active")
+  sortOrder      Int          @default(0) @map("sort_order")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  leadMagnets    LeadMagnet[]
+  cases          Case[]
 
   @@index([projectId, isActive])
   @@map("products")
@@ -572,18 +597,17 @@ model LeadMagnet {
 // ─── Publication (future) ───────────────────────────────
 
 model PublicationQueue {
-  id          String   @id @default(cuid())
-  postGroupId String   @unique @map("post_group_id")
-  platform    String
-  scheduledAt DateTime @map("scheduled_at")
-  status      String   @default("pending") // pending, published, failed
-  externalId  String?  @map("external_id")
-  errorMessage String? @map("error_message") @db.Text
-  postGroup   PostGroup @relation(fields: [postGroupId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  postGroupId  String    @unique @map("post_group_id")
+  platform     String
+  scheduledAt  DateTime  @map("scheduled_at")
+  status       String    @default("pending") // pending, published, failed
+  externalId   String?   @map("external_id")
+  errorMessage String?   @map("error_message") @db.Text
+  postGroup    PostGroup @relation(fields: [postGroupId], references: [id], onDelete: Cascade)
 
   @@map("publication_queue")
 }
-
 
 // ─── Content Tools (Global) ───────────────────────────────────
 
