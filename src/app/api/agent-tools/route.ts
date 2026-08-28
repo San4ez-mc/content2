@@ -511,10 +511,17 @@ async function getTopics(projectId: string, params: Record<string, unknown>) {
   const byRubric: Record<string, string[]> = {};
   for (const t of topics) {
     const lbl = RUBRIC_LABELS[t.rubric] || t.rubric;
-    (byRubric[lbl] ||= []).push(t.title);
+    // Тема, позначена схемою допису (content_type) і/або дотиком циклу (cycle_position) —
+    // помічаємо прямо в тексті, щоб пишучий агент бачив підказку і не мусив вигадувати.
+    const tag = [t.contentType, t.cyclePosition].filter(Boolean).join("/");
+    (byRubric[lbl] ||= []).push(tag ? `${t.title} [${tag}]` : t.title);
   }
   const text = Object.entries(byRubric).map(([r, list]) => `${r}:\n- ${list.join("\n- ")}`).join("\n\n");
-  return NextResponse.json({ ok: true, count: topics.length, topics: topics.map((t) => ({ id: t.id, rubric: t.rubric, title: t.title })), text });
+  return NextResponse.json({
+    ok: true, count: topics.length,
+    topics: topics.map((t) => ({ id: t.id, rubric: t.rubric, title: t.title, contentType: t.contentType, cyclePosition: t.cyclePosition })),
+    text,
+  });
 }
 
 // Returns active post structures (content_types) as guidance text.
