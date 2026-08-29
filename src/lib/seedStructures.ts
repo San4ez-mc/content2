@@ -100,3 +100,33 @@ export async function seedDefaultNetworkRules(projectId: string): Promise<{ upda
   }
   return { updated };
 }
+
+// Дефолтні канали — 4 основні текстові мережі. Без цього generate/bulk-import мовчки
+// пропускає КОЖЕН пост (networkByPlatform.get(platform) === undefined → continue),
+// і новий клієнт після повного онбордингу отримує "Збережено 0 пост(ів)" без пояснення.
+// Клієнт може вимкнути/додати мережі вручну в /networks — це лише стартовий набір.
+const DEFAULT_SOCIAL_NETWORKS: { platformKey: string; name: string; icon: string; color: string; linkPlacement: string }[] = [
+  { platformKey: "threads", name: "Threads Posts", icon: "🧵", color: "#9333ea", linkPlacement: "comment" },
+  { platformKey: "instagram", name: "Instagram", icon: "📸", color: "#ec4899", linkPlacement: "bio" },
+  { platformKey: "linkedin", name: "LinkedIn", icon: "💼", color: "#3b82f6", linkPlacement: "comment" },
+  { platformKey: "telegram", name: "Telegram", icon: "", color: "#229ED9", linkPlacement: "inline" },
+];
+
+export async function seedDefaultSocialNetworks(projectId: string): Promise<{ created: number }> {
+  const existing = await prisma.socialNetwork.findMany({ where: { projectId }, select: { platformKey: true } });
+  const have = new Set(existing.map((n) => n.platformKey));
+  let created = 0;
+  for (let i = 0; i < DEFAULT_SOCIAL_NETWORKS.length; i++) {
+    const n = DEFAULT_SOCIAL_NETWORKS[i];
+    if (have.has(n.platformKey)) continue;
+    await prisma.socialNetwork.create({
+      data: {
+        projectId, name: n.name, platformKey: n.platformKey, icon: n.icon || null, color: n.color,
+        isEnabled: true, sortOrder: i, linkPlacement: n.linkPlacement,
+        rules: DEFAULT_NETWORK_RULES[n.platformKey] || null,
+      },
+    });
+    created++;
+  }
+  return { created };
+}

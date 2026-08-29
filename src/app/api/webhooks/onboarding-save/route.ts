@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncStaticToVector } from "@/lib/vector-sync";
-import { seedDefaultStructures } from "@/lib/seedStructures";
+import { seedDefaultStructures, seedDefaultSocialNetworks } from "@/lib/seedStructures";
 
 // Викликається онбординг-воронками flows (Агент A). Пише артефакт у content2.
 // Ключові принципи: (1) таргетинг проєкту по projectId (не плодимо дублі);
@@ -29,8 +29,10 @@ export async function POST(req: NextRequest) {
   if (!project) {
     if (!projectName) return NextResponse.json({ error: "projectId or projectName required" }, { status: 400 });
     project = await prisma.project.create({ data: { name: projectName } });
-    // Новий проєкт одразу отримує канонічні структури постів (щоб не було порожньо).
+    // Новий проєкт одразу отримує канонічні структури постів (щоб не було порожньо)
+    // і базові канали (без каналу generate/bulk-import мовчки пропускає кожен пост).
     await seedDefaultStructures(project.id).catch(() => {});
+    await seedDefaultSocialNetworks(project.id).catch(() => {});
   }
   const pid = project.id;
 
