@@ -163,12 +163,14 @@ export async function POST(req: NextRequest) {
     imagePath = await saveBase64Image(body.imageBase64, subFolder, projectId);
   }
 
+  let allSlidePaths: string[] | null = null;
   if (!imagePath && Array.isArray(body.slidesBase64) && body.slidesBase64.length > 0) {
     const paths: string[] = [];
     for (const b64 of body.slidesBase64) {
       paths.push(await saveBase64Image(b64, subFolder, projectId));
     }
     imagePath = paths[0];
+    allSlidePaths = paths; // усі слайди — для Telegram media group нижче + збереження на PostItem
   }
 
   // Video output (from HeyGen avatars, Kling B-roll, Gemini/Veo, Remotion, etc.)
@@ -200,12 +202,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (postItemId && existingPostItem) {
+    // Каруселі: зберігаємо шляхи ВСІХ слайдів у funnelParams (imagePath лишається
+    // тільки прев'ю першого слайду для дашборду) — потрібно для повної доставки в Telegram нижче.
+    const mergedFunnelParams = allSlidePaths
+      ? { ...((existingPostItem.funnelParams as any) || {}), _allSlidePaths: allSlidePaths }
+      : undefined;
+
     const updated = await prisma.postItem.update({
       where: { id: postItemId },
       data: {
         generationStatus: status as any,
         ...(imagePath ? { imagePath } : {}),
         ...(errorMessage ? { generationError: errorMessage } : {}),
+        ...(mergedFunnelParams ? { funnelParams: mergedFunnelParams } : {}),
       },
       include: {
         group: {
@@ -255,7 +264,31 @@ export async function POST(req: NextRequest) {
       const tgBotToken = req.nextUrl.searchParams.get("telegramBotToken") || body.telegramBotToken || stored.botToken || null;
 
       if (tgChatId && tgBotToken) {
-        if (status === "done" && imagePath) {
+        if (status === "done" && imagePath && allSlidePaths && allSlidePaths.length > 1) {
+          // Карусель — шлемо ВСІ слайди одним альбомом (sendMediaGroup), не лише перший.
+          // Telegram обмежує альбом 10 елементами; довші каруселі — перші 10 + текстова примітка.
+          const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+          const toFullUrl = (p: string) => (p.startsWith("http") ? p : base + p);
+          const capped = allSlidePaths.slice(0, 10);
+          const caption = `✅ Готово — пост #${updated.group?.number ?? ""} (${networkName}, ${dateLabel})`;
+          const media = capped.map((p, i) => ({
+            type: "photo",
+            media: toFullUrl(p),
+            ...(i === 0 ? { caption } : {}),
+          }));
+          try {
+            await fetch(`https://api.telegram.org/bot${tgBotToken}/sendMediaGroup`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: tgChatId, media }),
+            });
+            if (allSlidePaths.length > 10) {
+              await sendTgText(tgBotToken, tgChatId, `(показано перші 10 із ${allSlidePaths.length} слайдів — решту дивись у дашборді)`);
+            }
+          } catch (tgErr: any) {
+            console.error("[generation-event] Telegram media group delivery failed:", tgErr.message);
+            await sendTgText(tgBotToken, tgChatId, `✅ Карусель готова (${networkName}, ${dateLabel}), але не вдалося надіслати сюди. Відкрий у дашборді.`);
+          }
+        } else if (status === "done" && imagePath) {
           const mediaFullUrl = imagePath.startsWith("http")
             ? imagePath
             : (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + imagePath;

@@ -226,6 +226,38 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
     }
   }
 
+  // Carousel photo fill: ролі, для яких фото суттєво покращує вигляд, але LLM його не дало —
+  // підставляємо РЕАЛЬНІ фото проєкту (не AI-згенеровані, не чужий проєкт) з галереї MediaItem,
+  // round-robin. Ролі, де фото має бути буквально конкретним (скріншот інтерфейсу) — не чіпаємо.
+  const PHOTO_FIELD_BY_ROLE: Record<string, string> = {
+    cover: "photoUrl", list: "photoUrl", photo_numbered: "photoUrl", quote: "photoUrl",
+    photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
+    circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
+  };
+  if (funnelSlug === "content-carousel" && funnelParams && Array.isArray(funnelParams.slides)) {
+    const needsPhoto = funnelParams.slides.some((s: any) => s && PHOTO_FIELD_BY_ROLE[s.role] && !s[PHOTO_FIELD_BY_ROLE[s.role]]);
+    if (needsPhoto) {
+      const gallery = await prisma.mediaItem.findMany({
+        where: { projectId, aiGenerated: false, mimeType: { startsWith: "image/" } },
+        orderBy: { createdAt: "desc" }, take: 30, select: { filePath: true },
+      }).catch(() => []);
+      if (gallery.length) {
+        const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+        let gi = 0;
+        funnelParams = {
+          ...funnelParams,
+          slides: funnelParams.slides.map((s: any) => {
+            const field = s && PHOTO_FIELD_BY_ROLE[s.role];
+            if (!field || s[field]) return s;
+            const url = base + gallery[gi % gallery.length].filePath;
+            gi++;
+            return { ...s, [field]: url };
+          }),
+        };
+      }
+    }
+  }
+
   const group = await prisma.postGroup.create({
     data: {
       projectId,
@@ -327,8 +359,46 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
   if (typeof patch === "string") { try { patch = JSON.parse(patch); } catch { patch = {}; } }
   let storedParams: any = item.funnelParams || {};
   if (typeof storedParams === "string") { try { storedParams = JSON.parse(storedParams); } catch { storedParams = {}; } }
-  const merged = { ...storedParams, ...patch };
+  let merged = { ...storedParams, ...patch };
   if (params.image_prompt) merged.imagePrompt = String(params.image_prompt);
+
+  // Той самий backfill, що й у create_post: якщо редагування каруселі принесло слайди
+  // без role (LLM забув), підставляємо з slideRoles обраної при створенні структури.
+  if (funnelSlug === "content-carousel" && Array.isArray(merged.slides) && (g as any).structureId) {
+    const structRow = await prisma.structure.findFirst({ where: { projectId, skeletonKey: (g as any).structureId }, select: { slideRoles: true } }).catch(() => null);
+    const roles = Array.isArray(structRow?.slideRoles) ? (structRow!.slideRoles as string[]) : null;
+    if (roles && roles.length) {
+      merged = { ...merged, slides: merged.slides.map((s: any, i: number) => (s && !s.role ? { ...s, role: roles[i % roles.length] } : s)) };
+    }
+  }
+  if (funnelSlug === "content-carousel" && Array.isArray(merged.slides)) {
+    const PHOTO_FIELD_BY_ROLE: Record<string, string> = {
+      cover: "photoUrl", list: "photoUrl", photo_numbered: "photoUrl", quote: "photoUrl",
+      photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
+      circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
+    };
+    const needsPhoto = merged.slides.some((s: any) => s && PHOTO_FIELD_BY_ROLE[s.role] && !s[PHOTO_FIELD_BY_ROLE[s.role]]);
+    if (needsPhoto) {
+      const gallery = await prisma.mediaItem.findMany({
+        where: { projectId, aiGenerated: false, mimeType: { startsWith: "image/" } },
+        orderBy: { createdAt: "desc" }, take: 30, select: { filePath: true },
+      }).catch(() => []);
+      if (gallery.length) {
+        const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+        let gi = 0;
+        merged = {
+          ...merged,
+          slides: merged.slides.map((s: any) => {
+            const field = s && PHOTO_FIELD_BY_ROLE[s.role];
+            if (!field || s[field]) return s;
+            const url = base + gallery[gi % gallery.length].filePath;
+            gi++;
+            return { ...s, [field]: url };
+          }),
+        };
+      }
+    }
+  }
 
   await prisma.postItem.update({
     where: { id: item.id },
