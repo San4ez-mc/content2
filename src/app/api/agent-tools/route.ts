@@ -211,6 +211,21 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   atoms.caseId = ci.caseId;
   atoms.topic = params.used_topic ? String(params.used_topic).slice(0, 300) : null;
 
+  // Carousel role backfill: LLM часто пише funnel_params.slides без поля role, попри
+  // інструкцію в промпті (не гарантія, а рекомендація для моделі). Якщо обрана Structure
+  // має slideRoles — підставляємо їх позиційно там, де role відсутнє, замість покладатись
+  // лише на fallback-ротацію самого флоу (яка не знає, яку структуру обрав LLM).
+  if (funnelSlug === "content-carousel" && funnelParams && Array.isArray(funnelParams.slides) && atoms.structureId) {
+    const structRow = await prisma.structure.findFirst({ where: { projectId, skeletonKey: atoms.structureId }, select: { slideRoles: true } }).catch(() => null);
+    const roles = Array.isArray(structRow?.slideRoles) ? (structRow!.slideRoles as string[]) : null;
+    if (roles && roles.length) {
+      funnelParams = {
+        ...funnelParams,
+        slides: funnelParams.slides.map((s: any, i: number) => (s && !s.role ? { ...s, role: roles[i % roles.length] } : s)),
+      };
+    }
+  }
+
   const group = await prisma.postGroup.create({
     data: {
       projectId,
