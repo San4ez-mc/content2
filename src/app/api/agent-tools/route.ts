@@ -215,15 +215,22 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   // інструкцію в промпті (не гарантія, а рекомендація для моделі). Якщо обрана Structure
   // має slideRoles — підставляємо їх позиційно там, де role відсутнє, замість покладатись
   // лише на fallback-ротацію самого флоу (яка не знає, яку структуру обрав LLM).
+  console.error("[DEBUG role-backfill] funnelSlug=", funnelSlug, "hasFunnelParams=", !!funnelParams, "slidesIsArray=", Array.isArray(funnelParams?.slides), "structureId=", atoms.structureId, "rawParamsStructure=", params.structure);
   if (funnelSlug === "content-carousel" && funnelParams && Array.isArray(funnelParams.slides) && atoms.structureId) {
-    const structRow = await prisma.structure.findFirst({ where: { projectId, skeletonKey: atoms.structureId }, select: { slideRoles: true } }).catch(() => null);
+    const structRow = await prisma.structure.findFirst({ where: { projectId, skeletonKey: atoms.structureId }, select: { slideRoles: true } }).catch((e) => { console.error("[DEBUG role-backfill] query error:", e?.message); return null; });
+    console.error("[DEBUG role-backfill] structRow=", JSON.stringify(structRow));
     const roles = Array.isArray(structRow?.slideRoles) ? (structRow!.slideRoles as string[]) : null;
     if (roles && roles.length) {
       funnelParams = {
         ...funnelParams,
         slides: funnelParams.slides.map((s: any, i: number) => (s && !s.role ? { ...s, role: roles[i % roles.length] } : s)),
       };
+      console.error("[DEBUG role-backfill] applied, slides now=", JSON.stringify(funnelParams.slides.map((s: any) => s.role)));
+    } else {
+      console.error("[DEBUG role-backfill] SKIPPED - no roles found");
     }
+  } else {
+    console.error("[DEBUG role-backfill] CONDITION FALSE - skipping entirely");
   }
 
   // Carousel photo fill: ролі, для яких фото суттєво покращує вигляд, але LLM його не дало —
