@@ -215,22 +215,30 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   // інструкцію в промпті (не гарантія, а рекомендація для моделі). Якщо обрана Structure
   // має slideRoles — підставляємо їх позиційно там, де role відсутнє, замість покладатись
   // лише на fallback-ротацію самого флоу (яка не знає, яку структуру обрав LLM).
-  console.error("[DEBUG role-backfill] funnelSlug=", funnelSlug, "hasFunnelParams=", !!funnelParams, "slidesIsArray=", Array.isArray(funnelParams?.slides), "structureId=", atoms.structureId, "rawParamsStructure=", params.structure);
+  try {
+    const { writeFile: __wf } = await import("fs/promises");
+    await __wf("/tmp/role_backfill_debug.log",
+      `${new Date().toISOString()} funnelSlug=${funnelSlug} hasFunnelParams=${!!funnelParams} slidesIsArray=${Array.isArray(funnelParams?.slides)} structureId=${atoms.structureId} rawParamsStructure=${JSON.stringify(params.structure)} rawFunnelParamsType=${typeof params.funnel_params}\n`,
+      { flag: "a" });
+  } catch {}
   if (funnelSlug === "content-carousel" && funnelParams && Array.isArray(funnelParams.slides) && atoms.structureId) {
-    const structRow = await prisma.structure.findFirst({ where: { projectId, skeletonKey: atoms.structureId }, select: { slideRoles: true } }).catch((e) => { console.error("[DEBUG role-backfill] query error:", e?.message); return null; });
-    console.error("[DEBUG role-backfill] structRow=", JSON.stringify(structRow));
+    const structRow = await prisma.structure.findFirst({ where: { projectId, skeletonKey: atoms.structureId }, select: { slideRoles: true } }).catch(() => null);
     const roles = Array.isArray(structRow?.slideRoles) ? (structRow!.slideRoles as string[]) : null;
+    try {
+      const { writeFile: __wf2 } = await import("fs/promises");
+      await __wf2("/tmp/role_backfill_debug.log", `  structRow=${JSON.stringify(structRow)} roles=${JSON.stringify(roles)}\n`, { flag: "a" });
+    } catch {}
     if (roles && roles.length) {
       funnelParams = {
         ...funnelParams,
         slides: funnelParams.slides.map((s: any, i: number) => (s && !s.role ? { ...s, role: roles[i % roles.length] } : s)),
       };
-      console.error("[DEBUG role-backfill] applied, slides now=", JSON.stringify(funnelParams.slides.map((s: any) => s.role)));
-    } else {
-      console.error("[DEBUG role-backfill] SKIPPED - no roles found");
     }
   } else {
-    console.error("[DEBUG role-backfill] CONDITION FALSE - skipping entirely");
+    try {
+      const { writeFile: __wf3 } = await import("fs/promises");
+      await __wf3("/tmp/role_backfill_debug.log", `  CONDITION FALSE\n`, { flag: "a" });
+    } catch {}
   }
 
   // Carousel photo fill: ролі, для яких фото суттєво покращує вигляд, але LLM його не дало —
