@@ -68,6 +68,76 @@ export async function POST(req: NextRequest) {
   const A_HOOK = new Set(["question", "provocation", "stat", "promise", "pain", "story", "counter", "listicle"]);
   const pick = (v: unknown, set: Set<string>) => (typeof v === "string" && set.has(v) ? v : null);
 
+  // Карусель: роль-бекап + фото з галереї (та сама логіка, що й у agent-tools createPost() —
+  // ЦЕЙ ендпоінт, а не create_post, є реальним шляхом, яким content-manager-v2 зберігає пости
+  // з пакетної генерації плану, тому дублюємо тут). Кеш galleryCache — один запит на весь батч.
+  const PHOTO_FIELD_BY_ROLE: Record<string, string> = {
+    cover: "photoUrl", list: "photoUrl", photo_numbered: "photoUrl", quote: "photoUrl",
+    photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
+    circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
+  };
+  let galleryCache: { filePath: string }[] | null = null;
+  let galleryIdx = 0;
+  const slideRolesCache = new Map<string, string[] | null>();
+  // LLM здебільшого досі пише лише {text, subText} на слайд, навіть коли role вже
+  // проставлено (бекфілом вище чи саме LLM) — ролі, яким потрібен items[]/quote,
+  // без цього рендеряться майже порожніми. Синтезуємо розумний дефолт із subText,
+  // це не заміна повноцінних даних від LLM, а страховка, щоб слайд не був голим.
+  const ITEMS_ROLES = new Set(["list", "photo_numbered", "feature_card", "spec_stack", "price_table", "offer_card", "recap_checklist", "audience_grid"]);
+  const QUOTE_ROLES = new Set(["quote", "manifesto"]);
+  function fillMissingFields(s: any): any {
+    if (!s || typeof s !== "object") return s;
+    const role = s.role;
+    if (ITEMS_ROLES.has(role) && !s.items && s.subText) {
+      return { ...s, items: [s.subText] };
+    }
+    if (QUOTE_ROLES.has(role) && !s.quote && (s.subText || s.text)) {
+      return { ...s, quote: s.quote || s.subText || s.text };
+    }
+    if (role === "case_study" && !s.items && !s.items2 && !s.body && s.subText) {
+      return { ...s, body: s.subText };
+    }
+    return s;
+  }
+  async function applyCarouselBackfill(fp: Record<string, unknown> | null, structureId: string | null): Promise<Record<string, unknown> | null> {
+    if (!fp || !Array.isArray((fp as any).slides)) return fp;
+    let out: any = fp;
+    if (structureId) {
+      if (!slideRolesCache.has(structureId)) {
+        const row = await prisma.structure.findFirst({ where: { projectId, skeletonKey: structureId }, select: { slideRoles: true } }).catch(() => null);
+        slideRolesCache.set(structureId, Array.isArray(row?.slideRoles) ? (row!.slideRoles as string[]) : null);
+      }
+      const roles = slideRolesCache.get(structureId);
+      if (roles && roles.length) {
+        out = { ...out, slides: out.slides.map((s: any, i: number) => (s && !s.role ? { ...s, role: roles[i % roles.length] } : s)) };
+      }
+    }
+    out = { ...out, slides: out.slides.map(fillMissingFields) };
+    const needsPhoto = out.slides.some((s: any) => s && PHOTO_FIELD_BY_ROLE[s.role] && !s[PHOTO_FIELD_BY_ROLE[s.role]]);
+    if (needsPhoto) {
+      if (galleryCache === null) {
+        galleryCache = await prisma.mediaItem.findMany({
+          where: { projectId, aiGenerated: false, mimeType: { startsWith: "image/" } },
+          orderBy: { createdAt: "desc" }, take: 30, select: { filePath: true },
+        }).catch(() => []);
+      }
+      if (galleryCache.length) {
+        const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
+        out = {
+          ...out,
+          slides: out.slides.map((s: any) => {
+            const field = s && PHOTO_FIELD_BY_ROLE[s.role];
+            if (!field || s[field]) return s;
+            const url = base + galleryCache![galleryIdx % galleryCache!.length].filePath;
+            galleryIdx++;
+            return { ...s, [field]: url };
+          }),
+        };
+      }
+    }
+    return out;
+  }
+
   for (const p of posts) {
     const platformKey = PLATFORM_MAP[p.platform] || p.platform || "instagram_posts";
     let network = networkByPlatform.get(platformKey);
@@ -103,10 +173,14 @@ export async function POST(req: NextRequest) {
 
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;
-    const funnelParams: Record<string, unknown> | null = p.funnel_params || null;
+    let funnelParams: Record<string, unknown> | null = p.funnel_params || null;
 
     // Backward compat: if no funnel_slug but has media_type, derive funnel_slug
     const derivedFunnelSlug = funnelSlug || deriveSlugFromMediaType(p.media_type);
+
+    if (derivedFunnelSlug === "content-carousel") {
+      funnelParams = await applyCarouselBackfill(funnelParams, atomData.structureId);
+    }
 
     // Determine if image generation is needed (скелети медіа не генерують).
     const needsGeneration = !skeletonMode && Boolean(derivedFunnelSlug && derivedFunnelSlug !== "text_only");
