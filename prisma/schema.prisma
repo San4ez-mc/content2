@@ -514,6 +514,7 @@ model Structure {
   hookTypes   Json     @default("[]") @map("hook_types") // рекомендовані типи хуків
   skeletonKey String?  @map("skeleton_key") // канонічний id для скорингу (aida|pas|case|...)
   rules       String?  @db.Text // формат-специфічні правила (рілс/карусель)
+  slideRoles  Json?    @map("slide_roles") // машинно-читана послідовність ролей слайдів каруселі (напр. ["cover","list","offer_card",...]); опційно, тільки для carousel-структур — валідує/скеровує вибір ролей LLM-агентом при create_post
   isActive    Boolean  @default(true) @map("is_active")
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")

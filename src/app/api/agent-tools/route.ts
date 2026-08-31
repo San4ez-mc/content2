@@ -537,9 +537,10 @@ async function getStructures(projectId: string, params: Record<string, unknown> 
     const pt = arr(t.postTypes).join("/") || "-";
     const hk = arr(t.hookTypes).join(", ");
     const len = t.minLen || t.maxLen ? ` ${t.minLen ?? "?"}-${t.maxLen ?? "?"}симв.` : "";
-    return `• ${t.name} [мережі: ${pl}; формати: ${pt}${len}; key=${t.skeletonKey || "-"}${hk ? `; хуки: ${hk}` : ""}]: ${t.structure || ""}${t.rules ? ` ПРАВИЛА ФОРМАТУ: ${t.rules}` : ""}`;
+    const sr = arr(t.slideRoles);
+    return `• ${t.name} [мережі: ${pl}; формати: ${pt}${len}; key=${t.skeletonKey || "-"}${hk ? `; хуки: ${hk}` : ""}]: ${t.structure || ""}${t.rules ? ` ПРАВИЛА ФОРМАТУ: ${t.rules}` : ""}${sr.length ? ` РОЛІ СЛАЙДІВ КАРУСЕЛІ (використай як каркас funnel_params.slides): ${sr.join(" → ")}` : ""}`;
   }).join("\n");
-  return NextResponse.json({ ok: true, count: types.length, text, structures: types.map((t) => ({ key: t.skeletonKey, name: t.name, platforms: t.platforms, postTypes: t.postTypes })) });
+  return NextResponse.json({ ok: true, count: types.length, text, structures: types.map((t) => ({ key: t.skeletonKey, name: t.name, platforms: t.platforms, postTypes: t.postTypes, slideRoles: arr(t.slideRoles) })) });
 }
 
 // Правила соцмереж (тон/довжина/хештеги/алгоритм) + куди йде CTA-лінк (linkPlacement).
