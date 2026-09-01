@@ -121,12 +121,21 @@ export async function POST(req: NextRequest) {
     null;
 
   // Ф2.4 ідемпотентність вебхуків: (postItemId, attempt) обробляється рівно один раз.
-  const attempt = Number(body.attempt ?? req.nextUrl.searchParams.get("attempt") ?? 1) || 1;
+  // ФІКС (2026-09-01): attempt — Prisma/Postgres Int (32-біт, максимум ~2.1 млрд). Мілісекундний
+  // Date.now() (~1.79e12) переповнював його — INSERT падав з помилкою "out of range", яку
+  // старий bare `catch` сприймав як "унікальний конфлікт" і мовчки повертав idempotent:true —
+  // тобто КОЖЕН колбек після першого рахувався дублем і зображення ніколи не зберігалось,
+  // скільки не ретрай. Секунди (не мілісекунди) влазять у Int32 аж до 2038 року.
+  const rawAttempt = Number(body.attempt ?? req.nextUrl.searchParams.get("attempt") ?? 1) || 1;
+  const attempt = rawAttempt > 2147483647 ? Math.floor(rawAttempt / 1000) : rawAttempt;
   if (postItemId) {
     try {
       await prisma.processedWebhook.create({ data: { unitId: postItemId, attempt } });
-    } catch {
-      // унікальний конфлікт (unitId, attempt) → цей вебхук уже оброблено, ігноруємо повтор
+    } catch (e: any) {
+      // P2002 = справжній унікальний конфлікт (unitId, attempt) → вебхук уже оброблено, ігноруємо.
+      // Будь-яка ІНША помилка (напр. знову вилізе якийсь ліміт типу) — це НЕ дублікат,
+      // прокидаємо далі, щоб не втрачати мовчки реальні завершені генерації.
+      if (e?.code !== "P2002") throw e;
       return NextResponse.json({ ok: true, idempotent: true, postItemId, attempt });
     }
   }

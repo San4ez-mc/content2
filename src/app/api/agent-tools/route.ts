@@ -838,7 +838,7 @@ function fireGeneration(itemId: string, groupId: string, funnelSlug: string, fun
   // не зберігалось, скільки не ретрай — навіть якщо рендер реально вдавався. Date.now()
   // гарантує унікальний attempt на кожен окремий виклик fireGeneration, зберігаючи захист
   // від справжніх дублікатів (мережевий повтор ТОГО САМОГО колбека).
-  const attempt = Date.now();
+  const attempt = Math.floor(Date.now() / 1000); // seconds, not ms — fits Postgres Int32
   let callbackUrl = CONTENT2 + "/api/webhooks/generation-event?token=" + WH_SECRET + "&postItemId=" + itemId + "&attempt=" + attempt;
   if (telegramChatId) callbackUrl += "&telegramChatId=" + encodeURIComponent(telegramChatId);
   if (telegramBotToken) callbackUrl += "&telegramBotToken=" + encodeURIComponent(telegramBotToken);
