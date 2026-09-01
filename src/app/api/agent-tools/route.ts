@@ -229,8 +229,11 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   // Carousel photo fill: ролі, для яких фото суттєво покращує вигляд, але LLM його не дало —
   // підставляємо РЕАЛЬНІ фото проєкту (не AI-згенеровані, не чужий проєкт) з галереї MediaItem,
   // round-robin. Ролі, де фото має бути буквально конкретним (скріншот інтерфейсу) — не чіпаємо.
+  // ФІКС (2026-09-01): "list"/"quote" прибрані — примусове фото на кожному list-слайді
+  // (найчастіша роль у структурах) робило майже кожну карусель "фото в полароїд-рамці"
+  // знову й знову. Без нього ці ролі лишаються текстовими, як у більшості референсів.
   const PHOTO_FIELD_BY_ROLE: Record<string, string> = {
-    cover: "photoUrl", list: "photoUrl", photo_numbered: "photoUrl", quote: "photoUrl",
+    cover: "photoUrl", photo_numbered: "photoUrl",
     photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
     circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
   };
@@ -243,7 +246,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
       }).catch(() => []);
       if (gallery.length) {
         const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
-        let gi = 0;
+        let gi = Math.floor(Math.random() * gallery.length); // ФІКС (2026-09-01): те саме, що й bulk-import/regenerateImage
         funnelParams = {
           ...funnelParams,
           slides: funnelParams.slides.map((s: any) => {
@@ -372,8 +375,9 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
     }
   }
   if (funnelSlug === "content-carousel" && Array.isArray(merged.slides)) {
+    // ФІКС (2026-09-01): "list"/"quote" прибрані — див. коментар у createPost() вище.
     const PHOTO_FIELD_BY_ROLE: Record<string, string> = {
-      cover: "photoUrl", list: "photoUrl", photo_numbered: "photoUrl", quote: "photoUrl",
+      cover: "photoUrl", photo_numbered: "photoUrl",
       photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
       circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
     };
@@ -385,7 +389,9 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
       }).catch(() => []);
       if (gallery.length) {
         const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
-        let gi = 0;
+        // ФІКС (2026-09-01): та сама проблема, що й у bulk-import — gi завжди стартував з 0,
+        // тож regenerate_image щоразу підставляв той самий перший файл галереї. Random-старт.
+        let gi = Math.floor(Math.random() * gallery.length);
         merged = {
           ...merged,
           slides: merged.slides.map((s: any) => {

@@ -71,8 +71,14 @@ export async function POST(req: NextRequest) {
   // Карусель: роль-бекап + фото з галереї (та сама логіка, що й у agent-tools createPost() —
   // ЦЕЙ ендпоінт, а не create_post, є реальним шляхом, яким content-manager-v2 зберігає пости
   // з пакетної генерації плану, тому дублюємо тут). Кеш galleryCache — один запит на весь батч.
+  // ФІКС (2026-09-01): "list" і "quote" прибрані звідси — фото для них опційне (LLM додає
+  // сам, якщо доречно), а тут раніше АВТОМАТИЧНО чіплялось до кожного list/quote-слайду без
+  // фото. "list" — найчастіша роль у карусельних структурах, тож майже КОЖЕН слайд-список у
+  // майже КОЖНІЙ каруселі виходив з однаковою "фото в білій полароїд-рамці" — саме це
+  // користувач і побачив як "одні й ті самі фрейми". Без примусового фото ці ролі лишаються
+  // текстовими (як у більшості референсів), і реальна різноманітність макетів стає видимою.
   const PHOTO_FIELD_BY_ROLE: Record<string, string> = {
-    cover: "photoUrl", list: "photoUrl", photo_numbered: "photoUrl", quote: "photoUrl",
+    cover: "photoUrl", photo_numbered: "photoUrl",
     photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
     circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
   };
