@@ -236,6 +236,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
     cover: "photoUrl", photo_numbered: "photoUrl",
     photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
     circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
+    collage_cutout_headline: "photoUrl", starburst_cta_badge: "photoUrl", product_callout_diagram: "photoUrl",
   };
   if (funnelSlug === "content-carousel" && funnelParams && Array.isArray(funnelParams.slides)) {
     const needsPhoto = funnelParams.slides.some((s: any) => s && PHOTO_FIELD_BY_ROLE[s.role] && !s[PHOTO_FIELD_BY_ROLE[s.role]]);
@@ -380,6 +381,7 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
       cover: "photoUrl", photo_numbered: "photoUrl",
       photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
       circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
+    collage_cutout_headline: "photoUrl", starburst_cta_badge: "photoUrl", product_callout_diagram: "photoUrl",
     };
     const needsPhoto = merged.slides.some((s: any) => s && PHOTO_FIELD_BY_ROLE[s.role] && !s[PHOTO_FIELD_BY_ROLE[s.role]]);
     if (needsPhoto) {

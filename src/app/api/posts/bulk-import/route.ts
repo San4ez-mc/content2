@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
     cover: "photoUrl", photo_numbered: "photoUrl",
     photo_portrait: "photoUrl", photo_cover_personal: "photoUrl", product_photo_cover: "photoUrl",
     circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
+    collage_cutout_headline: "photoUrl", starburst_cta_badge: "photoUrl", product_callout_diagram: "photoUrl",
   };
   let galleryCache: { filePath: string }[] | null = null;
   // ФІКС (2026-09-01): galleryIdx завжди стартував з 0 в межах ЦЬОГО HTTP-запиту — а кожен
