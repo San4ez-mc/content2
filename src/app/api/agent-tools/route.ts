@@ -60,7 +60,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "delete_posts": return await deletePosts(projectId, params);
       case "regenerate_image": return await regenerateImage(projectId, params, telegramChatId, telegramBotToken);
       case "send_media": return await sendMedia(projectId, params, telegramChatId, telegramBotToken);
-      case "list_media": return await listMedia(projectId);
+      case "list_media": return await listMedia(projectId, params);
       case "get_rules": return await getRules(projectId, params);
       case "get_writing_core": return await getWritingCore();
       case "check_writing": return await checkWriting(params);
@@ -409,11 +409,16 @@ async function regenerateImage(projectId: string, params: Record<string, unknown
   return NextResponse.json({ ok: true, number: g.number, funnel_slug: funnelSlug, funnel_params: merged });
 }
 
-async function listMedia(projectId: string) {
+async function listMedia(projectId: string, params: Record<string, unknown> = {}) {
+  // aiGenerated=false фільтрує НА РІВНІ БД — без цього "останні 50" після активної AI-генерації
+  // (каруселі/ai-bg постів) майже завжди виявляються ЛИШЕ AI-згенерованими, і реальні фото
+  // проєкту (яких може бути й 200) ніколи не потрапляють у видачу через звичайний take:50.
+  const aiFilter = params.aiGenerated === "false" ? false : params.aiGenerated === "true" ? true : undefined;
+  const take = Math.min(Number(params.limit) || 50, 200);
   const items = await prisma.mediaItem.findMany({
-    where: { projectId },
+    where: { projectId, ...(aiFilter !== undefined ? { aiGenerated: aiFilter } : {}) },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take,
   });
   return NextResponse.json({
     ok: true,
