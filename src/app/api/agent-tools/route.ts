@@ -831,7 +831,15 @@ async function pickRotatedPalette(projectId: string): Promise<string> {
 function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any, telegramChatId = "", telegramBotToken = "") {
   const CONTENT2 = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
   const WH_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
-  let callbackUrl = CONTENT2 + "/api/webhooks/generation-event?token=" + WH_SECRET + "&postItemId=" + itemId;
+  // ФІКС (2026-09-01): attempt раніше НІКОЛИ не передавався → завжди дефолтився на 1 у
+  // вебхуку. Ідемпотентність там ключується на (postItemId, attempt) — тож щойно перший
+  // колбек для якогось posItemId хоч раз доходив (навіть невдалий), КОЖЕН наступний
+  // regenerate_image для того самого поста ловив idempotent:true і зображення НІКОЛИ більше
+  // не зберігалось, скільки не ретрай — навіть якщо рендер реально вдавався. Date.now()
+  // гарантує унікальний attempt на кожен окремий виклик fireGeneration, зберігаючи захист
+  // від справжніх дублікатів (мережевий повтор ТОГО САМОГО колбека).
+  const attempt = Date.now();
+  let callbackUrl = CONTENT2 + "/api/webhooks/generation-event?token=" + WH_SECRET + "&postItemId=" + itemId + "&attempt=" + attempt;
   if (telegramChatId) callbackUrl += "&telegramChatId=" + encodeURIComponent(telegramChatId);
   if (telegramBotToken) callbackUrl += "&telegramBotToken=" + encodeURIComponent(telegramBotToken);
 
