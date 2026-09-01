@@ -77,7 +77,14 @@ export async function POST(req: NextRequest) {
     circle_photo_frame: "photoUrl", location_card: "photoUrl", native_text_over_photo: "photoUrl",
   };
   let galleryCache: { filePath: string }[] | null = null;
-  let galleryIdx = 0;
+  // ФІКС (2026-09-01): galleryIdx завжди стартував з 0 в межах ЦЬОГО HTTP-запиту — а кожен
+  // окремий пост із пакетної генерації (LLM викликає create_post по одному, не масивом)
+  // це ОКРЕМИЙ виклик bulk-import, отже ОКРЕМий свіжий galleryIdx=0. Наслідок: перше фото-слайд
+  // (найчастіше cover) у КОЖНОМУ пості брав рівно те саме перше фото галереї (orderBy
+  // createdAt desc — детерміновано однаковий результат) — картинки різних постів виглядали
+  // майже однаково. Рандомний старт розкидає перше фото по різних постах, лишаючи послідовний
+  // round-robin для слайдів УСЕРЕДИНІ одного посту.
+  let galleryIdx = Math.floor(Math.random() * 1000);
   const slideRolesCache = new Map<string, string[] | null>();
   // LLM здебільшого досі пише лише {text, subText} на слайд, навіть коли role вже
   // проставлено (бекфілом вище чи саме LLM) — ролі, яким потрібен items[]/quote,
@@ -120,6 +127,13 @@ export async function POST(req: NextRequest) {
           where: { projectId, aiGenerated: false, mimeType: { startsWith: "image/" } },
           orderBy: { createdAt: "desc" }, take: 30, select: { filePath: true },
         }).catch(() => []);
+        // ФІКС (2026-09-01): galleryIdx завжди стартував з 0 — а він живе в межах ОДНОГО
+        // HTTP-запиту bulk-import. Коли пости зі спільної теми/плану приходять пакетом
+        // (кожен окремим запитом), слайд-обкладинка (перший фото-слайд) у КОЖНОГО поста
+        // брав galleryCache[0] — той самий перший файл щоразу. Різні пости виглядали
+        // ідентично на обкладинці, хоч палітра/текст і відрізнялись. Випадковий старт
+        // розкидає, яке фото дістанеться слайду-обкладинці різних постів.
+        if (galleryCache.length) galleryIdx = Math.floor(Math.random() * galleryCache.length);
       }
       if (galleryCache.length) {
         const base = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
