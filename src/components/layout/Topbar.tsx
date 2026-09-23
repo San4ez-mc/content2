@@ -2,7 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -23,19 +23,53 @@ const NAV = [
 
 interface Props {
   user: { name?: string; email?: string; role?: string };
+  projects: { id: string; name: string }[];
+  activeProject: { id: string; name: string } | null;
 }
 
-export function Topbar({ user }: Props) {
+export function Topbar({ user, projects, activeProject }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+
+  async function switchProject(projectId: string) {
+    if (!projectId || projectId === activeProject?.id) return;
+    setSwitching(true);
+    try {
+      await fetch("/api/active-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      router.refresh();
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   return (
     <header className="h-10 bg-canvas-subtle border-b border-border flex items-center px-4 gap-0 sticky top-0 z-40 shrink-0">
       {/* Logo */}
-      <div className="flex items-center gap-1.5 mr-6 shrink-0">
+      <div className="flex items-center gap-1.5 mr-3 shrink-0">
         <span className="text-base">📋</span>
         <span className="text-xs font-display font-bold text-fg tracking-tight">CP2</span>
       </div>
+
+      {/* Company switcher — active company for every page in the dashboard */}
+      {projects.length > 1 && (
+        <select
+          value={activeProject?.id || ""}
+          onChange={(e) => switchProject(e.target.value)}
+          disabled={switching}
+          title="Активна компанія"
+          className="text-xs bg-canvas border border-border rounded px-2 py-1 text-fg mr-4 max-w-40 shrink-0 disabled:opacity-50"
+        >
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      )}
 
       {/* Nav — hidden on mobile (use bottom MobileNav instead) */}
       <nav className="hidden sm:flex items-center gap-0.5 flex-1">

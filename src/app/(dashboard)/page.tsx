@@ -1,35 +1,17 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { redirect } from "next/navigation";
+import { resolveActiveProject } from "@/lib/tenant";
 
 export default async function HomePage({
   searchParams,
 }: {
   searchParams: { projectId?: string; month?: string };
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  const { user, activeProject } = await resolveActiveProject(searchParams.projectId);
+  if (!user) redirect("/login");
 
-  const userId = (session.user as any).id;
-
-  // Get user's projects
-  const projectUsers = await prisma.projectUser.findMany({
-    where: { userId },
-    include: { project: true },
-    orderBy: { project: { createdAt: "asc" } },
-  });
-
-  // Also include superadmin access to all projects
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  let projects = projectUsers.map((pu) => pu.project);
-
-  if (user?.role === "superadmin") {
-    projects = await prisma.project.findMany({ orderBy: { createdAt: "asc" } });
-  }
-
-  if (projects.length === 0) {
+  if (!activeProject) {
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
@@ -42,9 +24,6 @@ export default async function HomePage({
       </div>
     );
   }
-
-  const activeProjectId = searchParams.projectId || projects[0].id;
-  const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0];
 
   // Parse month (YYYY-MM)
   const now = new Date();
@@ -75,7 +54,6 @@ export default async function HomePage({
 
   return (
     <CalendarView
-      projects={projects}
       activeProject={activeProject}
       postGroups={JSON.parse(JSON.stringify(postGroups))}
       socialNetworks={JSON.parse(JSON.stringify(socialNetworks))}

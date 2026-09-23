@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser, canAccessProject } from "@/lib/tenant";
+import { getSessionUser, canAccessProject, resolveActiveProject } from "@/lib/tenant";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -16,16 +16,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Get user's first project if not specified
-  let pid: string | null = projectId ?? null;
-  if (!pid) {
-    const pu = await prisma.projectUser.findFirst({ where: { userId } });
-    pid = pu?.projectId ?? null;
-    if (!pid && sUser.role === "superadmin") {
-      const p = await prisma.project.findFirst();
-      pid = p?.id ?? null;
-    }
-  }
+  // Активна компанія — та сама, що на всіх сторінках дашборду (кука перемикача Topbar).
+  const pid = projectId || (await resolveActiveProject()).activeProject?.id || null;
 
   if (!pid) return NextResponse.json({ error: "No project" }, { status: 400 });
 

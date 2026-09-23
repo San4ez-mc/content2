@@ -40,7 +40,6 @@ interface PostGroup {
 }
 
 interface Props {
-  projects: { id: string; name: string }[];
   activeProject: { id: string; name: string };
   postGroups: PostGroup[];
   socialNetworks: { id: string; name: string; platformKey: string; color: string | null }[];
@@ -57,7 +56,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   tiktok: "#06b6d4",
 };
 
-export function CalendarView({ projects, activeProject, postGroups: initialGroups, socialNetworks, monthStr }: Props) {
+export function CalendarView({ activeProject, postGroups: initialGroups, socialNetworks, monthStr }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedPost, setSelectedPost] = useState<PostGroup | null>(null);
@@ -184,12 +183,12 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
 
   function prevMonth() {
     const d = new Date(year, month - 2);
-    router.push(`/?projectId=${activeProject.id}&month=${format(d, "yyyy-MM")}`);
+    router.push(`/?month=${format(d, "yyyy-MM")}`);
   }
 
   function nextMonth() {
     const d = new Date(year, month);
-    router.push(`/?projectId=${activeProject.id}&month=${format(d, "yyyy-MM")}`);
+    router.push(`/?month=${format(d, "yyyy-MM")}`);
   }
 
   return (
@@ -206,19 +205,6 @@ export function CalendarView({ projects, activeProject, postGroups: initialGroup
         </div>
 
         <div className="w-px h-4 bg-border" />
-
-        {/* Project selector */}
-        {projects.length > 1 && (
-          <select
-            value={activeProject.id}
-            onChange={(e) => router.push(`/?projectId=${e.target.value}&month=${monthStr}`)}
-            className="text-xs bg-canvas border border-border rounded px-2 py-1 text-fg"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        )}
 
         {/* Network filters — radio (single select, null = all) */}
         <div className="flex items-center gap-1.5 flex-wrap">

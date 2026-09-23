@@ -1,32 +1,15 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { resolveActiveProject } from "@/lib/tenant";
 import { UserDataView } from "@/components/user-data/UserDataView";
 
 export const metadata = { title: "Дані користувача" };
 
 export default async function UserDataPage({ searchParams }: { searchParams: { projectId?: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-
-  const userId = (session.user as any).id;
-  const role = (session.user as any).role;
-
-  let projectId: string | null = null;
-  if (role === "superadmin") {
-    const p = searchParams.projectId
-      ? await prisma.project.findUnique({ where: { id: searchParams.projectId } })
-      : await prisma.project.findFirst();
-    projectId = p?.id || null;
-  } else {
-    const pu = await prisma.projectUser.findFirst({
-      where: searchParams.projectId ? { userId, projectId: searchParams.projectId } : { userId },
-    });
-    projectId = pu?.projectId || null;
-  }
-
-  if (!projectId) redirect("/");
+  const { user, activeProject } = await resolveActiveProject(searchParams.projectId);
+  if (!user) redirect("/login");
+  if (!activeProject) redirect("/");
+  const projectId = activeProject.id;
 
   const [project, brand, personas, products, cases, strategy, topicsCount] = await Promise.all([
     prisma.project.findUnique({ where: { id: projectId } }),
