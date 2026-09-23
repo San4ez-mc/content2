@@ -126,6 +126,9 @@ export async function POST(req: NextRequest) {
             id: g.id,
             platform: g.socialNetwork.platformKey,
             type: g.type,
+            sendToTelegram: g.socialNetwork.sendToTelegram,
+            postDirectly: g.socialNetwork.postDirectly,
+            autopostSlug: g.socialNetwork.autopostSlug,
             items: g.items.map((i) => ({
               content: i.content,
               imagePath: i.imagePath,

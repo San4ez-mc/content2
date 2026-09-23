@@ -7,7 +7,18 @@ import { cn } from "@/lib/utils";
 interface Network {
   id: string; projectId: string; name: string; platformKey: string;
   icon: string | null; color: string | null; rules: string | null; linkPlacement: string | null;
+  sendToTelegram: boolean; postDirectly: boolean; autopostSlug: string | null;
 }
+
+// Відомі воронки автопублікації у Flows (platformKey → botId редактора воронки).
+// Дає пряме посилання на вкладку «Ключі» — інакше треба шукати воронку вручну.
+const FLOWS_AUTOPOST_BOTS: Record<string, string> = {
+  threads: "cacaf5fb-6ac4-4c34-9a3f-a5a31bbea55c",
+  tiktok: "8beb51be-da07-4c2e-9e56-9cbf4540b4ce",
+  linkedin: "17e26df5-57e5-4966-a779-dbf8b4fe35c0",
+  youtube: "346ccf50-7ecf-490c-9aad-460f2ab6c2a2",
+  x: "9986c85f-a068-477b-a27f-34404d8dc150",
+};
 interface Format {
   id: string; key: string; name: string; mediaTypes: string[]; aspect: string | null; settings: Record<string, any>; isActive: boolean; sortOrder: number;
 }
@@ -51,6 +62,10 @@ export function NetworkDetailView({ network, formats: initialFormats }: { networ
   const [linkPlacement, setLinkPlacement] = useState(network.linkPlacement || "");
   const [savedRules, setSavedRules] = useState(false);
   const [formats, setFormats] = useState<Format[]>(initialFormats);
+  const [sendToTelegram, setSendToTelegram] = useState(network.sendToTelegram);
+  const [postDirectly, setPostDirectly] = useState(network.postDirectly);
+  const [autopostSlug, setAutopostSlug] = useState(network.autopostSlug || `publish-${network.platformKey}`);
+  const autopostBotId = FLOWS_AUTOPOST_BOTS[network.platformKey];
 
   async function saveNetwork(patch: Record<string, any>) {
     await fetch(`/api/networks/${network.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
@@ -117,6 +132,57 @@ export function NetworkDetailView({ network, formats: initialFormats }: { networ
             ))}
           </div>
           {linkPlacement && <Hint text={LINK_OPTIONS.find((o) => o.value === linkPlacement)?.hint || ""} />}
+        </section>
+
+        {/* Доставка */}
+        <section className="border border-border rounded-xl bg-canvas-subtle p-4">
+          <h2 className="text-sm font-semibold text-fg">Доставка</h2>
+          <Hint text="Що робити з готовим постом цієї мережі, коли настав запланований час." />
+
+          <label className="flex items-center gap-2 text-xs text-fg-muted cursor-pointer mt-3">
+            <input
+              type="checkbox"
+              checked={sendToTelegram}
+              onChange={(e) => { setSendToTelegram(e.target.checked); saveNetwork({ sendToTelegram: e.target.checked }); }}
+            />
+            Присилати в Telegram
+          </label>
+          <Hint text="Дайджест власнику в Telegram — так, як зараз працює для всіх мереж." />
+
+          <label className="flex items-center gap-2 text-xs text-fg-muted cursor-pointer mt-3">
+            <input
+              type="checkbox"
+              checked={postDirectly}
+              onChange={(e) => { setPostDirectly(e.target.checked); saveNetwork({ postDirectly: e.target.checked, autopostSlug: autopostSlug || null }); }}
+            />
+            Постити в соц.мережу автоматично
+          </label>
+          <Hint text="Публікує напряму через воронку автопостингу в Flows — без ручних дій, у заплановану дату." />
+
+          {postDirectly && (
+            <div className="mt-3 pl-6 space-y-2">
+              <div>
+                <label className="block text-[11px] font-medium text-fg-muted mb-1">Slug воронки в Flows</label>
+                <input
+                  className="input text-xs max-w-xs"
+                  value={autopostSlug}
+                  onChange={(e) => setAutopostSlug(e.target.value)}
+                  onBlur={() => saveNetwork({ autopostSlug: autopostSlug || null })}
+                  placeholder={`publish-${network.platformKey}`}
+                />
+                <Hint text="Назва (slug) воронки-публікатора в Flows, яку викликати. За замовчуванням publish-<platformKey>." />
+              </div>
+              <a
+                href={autopostBotId ? `https://flows.fineko.space/funnel/${autopostBotId}` : "https://flows.fineko.space/funnels"}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block text-xs text-accent hover:underline"
+              >
+                🔑 Відкрити ключі воронки «{autopostSlug}» у Flows →
+              </a>
+              <Hint text="Там треба вставити токени доступу до самої соцмережі (напр. THREADS_USER_ID / THREADS_ACCESS_TOKEN) — окремо для кожної мережі, за інструкцією платформи." />
+            </div>
+          )}
         </section>
 
         {/* Формати */}

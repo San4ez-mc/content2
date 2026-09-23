@@ -106,6 +106,9 @@ model SocialNetwork {
   sortOrder     Int         @default(0) @map("sort_order")
   rules         String?     @db.Text // правила саме цієї мережі (тон, довжина, хештеги, лінки, алгоритм)
   linkPlacement String?     @map("link_placement") // куди йде CTA-лінк: comment | inline | bio | description
+  sendToTelegram Boolean    @default(true) @map("send_to_telegram") // дублювати пост власнику в Telegram
+  postDirectly  Boolean     @default(false) @map("post_directly") // автопублікація напряму в мережу через Flows-воронку
+  autopostSlug  String?     @map("autopost_slug") // slug воронки в Flows (напр. publish-threads), яку викликати для postDirectly
   project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   postGroups    PostGroup[]
   formats       Format[]
