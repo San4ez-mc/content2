@@ -21,4 +21,16 @@ describe("scanWriting (C3 grep-gate)", () => {
     expect(scanWriting("Це нормально — одне тире на абзац.")).toEqual([]);
     expect(scanWriting("Це — забагато — тире в абзаці.").some((x) => x.type === "dash_overuse")).toBe(true);
   });
+
+  it("буліт-список («— пункт» на початку рядка) — НЕ dash_overuse (регрес 2026-09-30)", () => {
+    // Реальний кейс, який гейт хибно відхиляв: KIRO-пост зі списком "Зробив:" тримав
+    // 3 пости в чернетках хоча жодного em-dash overuse в прозі немає — це буліти.
+    const bulletList = "Зробив:\n— Додаток пройшов внутрішнє тестування\n— Відправив на перевірку в Google Play\n— Почав готувати App Store";
+    expect(scanWriting(bulletList).some((x) => x.type === "dash_overuse")).toBe(false);
+  });
+
+  it("буліт-список НЕ маскує справжнє зловживання тире всередині одного з пунктів", () => {
+    const mixed = "Зробив:\n— перше — друге — третє в одному рядку\n— просто пункт";
+    expect(scanWriting(mixed).some((x) => x.type === "dash_overuse")).toBe(true);
+  });
 });
