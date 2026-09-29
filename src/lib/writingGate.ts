@@ -13,6 +13,8 @@ export function scanWriting(text: string): Violation[] {
   const violations: Violation[] = [];
   const low = String(text || "").toLowerCase();
   for (const w of WBANNED) if (low.includes(w)) violations.push({ type: "banned_word", detail: `стоп-слово «${w}»` });
+  const paras = String(text || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  for (const p of paras) {
     // Списки (буліт «— пункт» ЧИ нумерований «1. Назва — опис») законно несуть одне
     // тире-роздільник на кожен рядок — це не стилістичне зловживання тире в реченні
     // (те, що правило й мало ловити), а структура списку. Без цього звичайний список
