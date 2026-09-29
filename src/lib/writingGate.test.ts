@@ -61,4 +61,13 @@ describe("scanWriting (C3 grep-gate)", () => {
     const singleBullet = "Де застряг:\n— Причина. Тому чекаю — і шукаю людей :)";
     expect(scanWriting(singleBullet).some((x) => x.type === "dash_overuse")).toBe(false);
   });
+
+  it("«друзів»/«друзями» не тригерить greeting_start — це не звернення «друзі,» (регрес 2026-09-30)", () => {
+    // Реальний кейс: KIRO-пост "Побачив фото друзів із пікніка" ловився через підрядок
+    // "друзі" всередині "друзів" — startsWith-по-підрядку без межі слова.
+    expect(scanWriting("Побачив фото друзів із пікніка в неділю.").some((x) => x.type === "greeting_start")).toBe(false);
+    expect(scanWriting("Зустрівся з друзями ввечері.").some((x) => x.type === "greeting_start")).toBe(false);
+    // Справжнє звернення "Друзі," — досі ловиться
+    expect(scanWriting("Друзі, є новина.").some((x) => x.type === "greeting_start")).toBe(true);
+  });
 });

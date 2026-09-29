@@ -36,6 +36,9 @@ export function scanWriting(text: string): Violation[] {
     for (const c of WSUMMARY) if (pl.startsWith(c + " ") || pl.startsWith(c + ",")) violations.push({ type: "summary_cliche", detail: `абзац починається з «${c}»` });
   }
   const start = low.replace(/^\s+/, "").slice(0, 45);
-  for (const g of WGREETING) if (start.includes(g)) violations.push({ type: "greeting_start", detail: `привітання на старті «${g}»` });
+  // Межа слова: «start.includes(g)» ловив «друзі» всередині «друзів»/«друзями» — інші
+  // слова, не звернення-привітання. «(?![а-яіїєґ'])» дозволяє «друзі,»/«друзі!»/«друзі »
+  // (кінець слова), але не «друзів» (далі йде літера — це інше слово).
+  for (const g of WGREETING) if (new RegExp(g + "(?![а-яіїєґ'])", "i").test(start)) violations.push({ type: "greeting_start", detail: `привітання на старті «${g}»` });
   return violations;
 }
