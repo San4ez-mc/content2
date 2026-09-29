@@ -228,7 +228,16 @@ export async function POST(req: NextRequest) {
         generationStatus: "generating_text",
         content: "",
         id: { notIn: Array.from(claimedIds) },
-        group: { is: { projectId, postDate, socialNetworkId: network.id, type: postType as any } },
+        // NB: не звіряємо group.type тут. Placeholder дістає свій type із
+        // ЗАПЛАНОВАНОГО завдання (chat-placeholders, format=threads_single -> "single"),
+        // а LLM для того самого посту часто пише post_type:"thread" (плутає назву мережі
+        // Threads із форматом "тред-ланцюг" — обидва відображені в каталозі форматів
+        // (formats.key="thread") і LLM бере не той). Результат: postType, порахований
+        // тут нижче, НЕ збігався з type плейсхолдера -> claim ніколи не спрацьовував,
+        // плейсхолдер лишався порожнім і за 15хв watchdog позначав його "failed"
+        // (виявлено 2026-09-29 на реальній генерації для KIRO — 21 такий сирітський
+        // пост при плані на 42). type плейсхолдера НІЖЕ й так не перезаписується.
+        group: { is: { projectId, postDate, socialNetworkId: network.id } },
       },
       orderBy: { createdAt: "asc" },
       include: { group: true },
