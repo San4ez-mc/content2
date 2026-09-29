@@ -13,16 +13,25 @@ export function scanWriting(text: string): Violation[] {
   const violations: Violation[] = [];
   const low = String(text || "").toLowerCase();
   for (const w of WBANNED) if (low.includes(w)) violations.push({ type: "banned_word", detail: `стоп-слово «${w}»` });
-  const paras = String(text || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  for (const p of paras) {
-    // «—» на початку рядка — це буліт-список («— пункт»), а не стилістичне зловживання
-    // тире в реченні (те, що це правило й мало ловити). Без цього розділення звичайний
-    // список із 2-3 пунктів («Зробив:\n— раз\n— два\n— три») відхилявся як «забагато
-    // тире», хоча жодного em-dash overuse в прозі там немає (виявлено 2026-09-30 на
-    // реальних постах KIRO — гейт мовчки ховав у чернетки цілком якісні пости).
-    const totalDashes = (p.match(/—/g) || []).length;
-    const bulletDashes = (p.match(/^[ \t]*—/gm) || []).length;
-    const dashes = totalDashes - bulletDashes;
+    // Списки (буліт «— пункт» ЧИ нумерований «1. Назва — опис») законно несуть одне
+    // тире-роздільник на кожен рядок — це не стилістичне зловживання тире в реченні
+    // (те, що правило й мало ловити), а структура списку. Без цього звичайний список
+    // із 2-5 пунктів відхилявся як «забагато тире», хоча жодного em-dash overuse в
+    // прозі немає (виявлено 2026-09-30 на реальних постах KIRO — гейт мовчки ховав у
+    // чернетки цілком якісні пости). Другий/зайвий дефіс У ТОМУ Ж рядку списку —
+    // і будь-яке накопичення тире у звичайному абзаці — досі ловиться.
+    const lines = p.split("\n");
+    const isListy = lines.filter((l) => /^\s*(—|[0-9]+[.)]|[-*•])\s/.test(l)).length >= 2;
+    let dashes;
+    if (isListy) {
+      dashes = lines.reduce((sum, l) => {
+        const lineDashes = (l.match(/—/g) || []).length;
+        const isListLine = /^\s*(—|[0-9]+[.)]|[-*•])\s/.test(l);
+        return sum + (isListLine ? Math.max(0, lineDashes - 1) : lineDashes);
+      }, 0);
+    } else {
+      dashes = (p.match(/—/g) || []).length;
+    }
     if (dashes > 1) violations.push({ type: "dash_overuse", detail: `${dashes} тире в одному абзаці (макс 1)` });
     const pl = p.toLowerCase();
     for (const c of WSUMMARY) if (pl.startsWith(c + " ") || pl.startsWith(c + ",")) violations.push({ type: "summary_cliche", detail: `абзац починається з «${c}»` });
