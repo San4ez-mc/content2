@@ -22,18 +22,15 @@ export function scanWriting(text: string): Violation[] {
     // прозі немає (виявлено 2026-09-30 на реальних постах KIRO — гейт мовчки ховав у
     // чернетки цілком якісні пости). Другий/зайвий дефіс У ТОМУ Ж рядку списку —
     // і будь-яке накопичення тире у звичайному абзаці — досі ловиться.
-    const lines = p.split("\n");
-    const isListy = lines.filter((l) => /^\s*(—|[0-9]+[.)]|[-*•])\s/.test(l)).length >= 2;
-    let dashes;
-    if (isListy) {
-      dashes = lines.reduce((sum, l) => {
-        const lineDashes = (l.match(/—/g) || []).length;
-        const isListLine = /^\s*(—|[0-9]+[.)]|[-*•])\s/.test(l);
-        return sum + (isListLine ? Math.max(0, lineDashes - 1) : lineDashes);
-      }, 0);
-    } else {
-      dashes = (p.match(/—/g) || []).length;
-    }
+    // Один рядок-пункт списку (навіть якщо в абзаці він єдиний, напр. «Де застряг:\n—
+    // одна причина») — теж законний, тому поріг «isListy тільки з 2+ рядків» звідси
+    // прибрано: він хибно ловив «2 тире» на абзаці з ОДНИМ буліт-пунктом, де другий
+    // дефіс був просто в середині того самого речення (регрес під час фіксу 2026-09-30).
+    const dashes = p.split("\n").reduce((sum, l) => {
+      const lineDashes = (l.match(/—/g) || []).length;
+      const isListLine = /^\s*(—|[0-9]+[.)]|[-*•])\s/.test(l);
+      return sum + (isListLine ? Math.max(0, lineDashes - 1) : lineDashes);
+    }, 0);
     if (dashes > 1) violations.push({ type: "dash_overuse", detail: `${dashes} тире в одному абзаці (макс 1)` });
     const pl = p.toLowerCase();
     for (const c of WSUMMARY) if (pl.startsWith(c + " ") || pl.startsWith(c + ",")) violations.push({ type: "summary_cliche", detail: `абзац починається з «${c}»` });
