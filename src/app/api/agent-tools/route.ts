@@ -263,6 +263,15 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
     }
   }
 
+  // Так само, як у bulk-import: без scheduleTime проєкт БЕЗ календарних слотів
+  // (schedule_settings) ніколи не бере цей пост у /api/scheduler/run
+  // (withinWindow(g.scheduleTime) у fallback-гілці) — автопостинг мовчки не спрацьовує.
+  // create_post — це ОДИН пост за раз (не батч), тому просто беремо найближчий робочий
+  // слот крону замість розподілу по дню; params.schedule_time лишає можливість задати явно.
+  const scheduleTime = typeof params.schedule_time === "string" && /^\d{1,2}:\d{2}$/.test(params.schedule_time)
+    ? params.schedule_time
+    : "12:00";
+
   const group = await prisma.postGroup.create({
     data: {
       projectId,
@@ -271,6 +280,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
       type: formatToPostGroupType(normalizeFormat(params.format ?? params.post_type)) as any,
       formatKey: normalizeFormat(params.format ?? params.post_type),
       audience: String(params.audience || "cold"),
+      scheduleTime,
       ...atoms,
       status: "scheduled",
       items: {

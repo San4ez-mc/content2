@@ -171,6 +171,12 @@ export async function POST(req: NextRequest) {
     const postType = formatToPostGroupType(formatKey);
     const audience = AUDIENCE_VALID.has(p.audience) ? p.audience : "cold";
     const postDate = p.date ? new Date(p.date) : new Date();
+    // Час публікації конкретного посту — потрібен для проєктів БЕЗ календарних слотів
+    // (schedule_settings), де scheduler/run бере due-пости саме за їхнім власним scheduleTime
+    // (див. content2 /api/scheduler/run: withinWindow(g.scheduleTime) у fallback-гілці).
+    // Раніше цей рядок ніхто не заповнював — пости лягали з scheduleTime=null і НІКОЛИ не
+    // ставали "due", тобто автопостинг мовчки не спрацьовував для будь-якого проєкту без слотів.
+    const scheduleTime = typeof p.schedule_time === "string" && /^\d{1,2}:\d{2}$/.test(p.schedule_time) ? p.schedule_time : null;
 
     // Атоми конструктора (структура/хук/доказ/намір) → поля PostGroup для скорингу.
     const atomData: any = {
@@ -238,7 +244,7 @@ export async function POST(req: NextRequest) {
         where: { id: placeholder.id },
         data: itemData,
       });
-      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, formatKey, status: groupStatus as any, ...atomData } });
+      await prisma.postGroup.update({ where: { id: placeholder.groupId }, data: { audience, formatKey, status: groupStatus as any, ...(scheduleTime ? { scheduleTime } : {}), ...atomData } });
       groupId = placeholder.groupId;
       itemId = updatedItem.id;
       number = (placeholder.group as any).number;
@@ -252,6 +258,7 @@ export async function POST(req: NextRequest) {
           formatKey,
           audience,
           skeleton: skeletonMode,
+          ...(scheduleTime ? { scheduleTime } : {}),
           ...atomData,
           status: groupStatus as any,
           items: { create: [{ orderIndex: 0, ...itemData }] },
