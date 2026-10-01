@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
     const slotHit = slotsOf(dayName).some(withinWindow);
 
     // Find scheduled posts for today in this project
-    const candidates = await prisma.postGroup.findMany({
+    const candidatesRaw = await prisma.postGroup.findMany({
       where: {
         projectId: schedule.projectId,
         postDate: new Date(todayStr),
@@ -138,6 +138,18 @@ export async function POST(req: NextRequest) {
         items: { orderBy: { orderIndex: "asc" } },
         socialNetwork: true,
       },
+    });
+    // Safety net: a chat-placeholder row is created with status "scheduled" the
+    // instant generation STARTS (so the calendar shows "генерується текст"), before
+    // bulk-import ever fills it in. If it's never claimed (count mismatch between
+    // planned and actually-generated posts) it sits here forever, empty, with
+    // status "scheduled" — and would otherwise get published to Threads blank.
+    // Found 2026-10-01: 6 such orphans on a real KIRO batch, still unpublished only
+    // because no cron tick had hit their window yet. Never treat an empty/still-
+    // generating post as due, regardless of how it ended up "scheduled".
+    const candidates = candidatesRaw.filter((g) => {
+      const item = g.items[0];
+      return item && item.content && item.content.trim().length > 0 && item.generationStatus !== "generating_text";
     });
 
     const due = hasAnySlots ? (slotHit ? candidates : []) : candidates.filter((g) => withinWindow(g.scheduleTime));
