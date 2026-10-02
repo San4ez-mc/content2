@@ -43,7 +43,9 @@ export async function syncStaticToVector(
 
   const [project, brand, personas, products, cases, strategy] = await Promise.all([
     prisma.project.findUnique({ where: { id: projectId } }),
-    prisma.knowledgeEntry.findMany({ where: { projectId, isActive: true } }),
+    // Факти з датами (category="fact") у вектор НЕ йдуть: вони живуть у блоці АКТУАЛЬНІ ФАКТИ (get_facts),
+    // інакше застарілі формулювання лишались би в пошуку до наступного ре-синку.
+    prisma.knowledgeEntry.findMany({ where: { projectId, isActive: true, NOT: { category: "fact" } } }),
     prisma.persona.findMany({ where: { projectId } }),
     prisma.product.findMany({ where: { projectId }, include: { leadMagnets: true } }),
     prisma.case.findMany({ where: { projectId } }),

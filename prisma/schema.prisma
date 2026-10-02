@@ -466,11 +466,19 @@ model KnowledgeEntry {
   content   String   @db.Text
   addedBy   String   @default("user") @map("added_by") // user | bot
   isActive  Boolean  @default(true) @map("is_active")
+  // Факти з датами (category="fact"): що актуально зараз, що застаріло. Логіка — src/lib/facts.ts
+  topic        String?   // тема факту; новий факт тієї ж теми замінює старий
+  validFrom    DateTime? @map("valid_from") @db.Date
+  validUntil   DateTime? @map("valid_until") @db.Date
+  supersededAt DateTime? @map("superseded_at")
+  supersededBy String?   @map("superseded_by")
+  staleMarkers String?   @map("stale_markers") @db.Text // фрази старого формулювання (по одній на рядок), яких не має бути в постах, поки факт діє
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, isActive])
+  @@index([projectId, category])
   @@map("knowledge_entries")
 }
 

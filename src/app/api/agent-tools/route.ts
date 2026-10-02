@@ -7,6 +7,7 @@ import { vectorSearch } from "@/lib/vector";
 import { scanWriting } from "@/lib/writingGate";
 import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
+import { saveFactCore, listFactsCore, expireFactCore, collectStalePosts } from "@/lib/factsDb";
 
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
@@ -69,6 +70,10 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_cases": return await getCases(projectId);
       case "get_strategy": return await getStrategy(projectId);
       case "save_rule": return await saveRule(projectId, params);
+      case "save_fact": return await saveFact(projectId, params);
+      case "get_facts": return await getFacts(projectId, params);
+      case "expire_fact": return await expireFact(projectId, params);
+      case "find_stale_posts": return await findStalePosts(projectId);
       case "get_topics": return await getTopics(projectId, params);
       case "get_structures": return await getStructures(projectId, params);
       case "get_network_rules": return await getNetworkRules(projectId, params);
@@ -456,7 +461,7 @@ async function getRules(projectId: string, params: Record<string, unknown>) {
   const entries = await prisma.knowledgeEntry.findMany({
     where: {
       projectId, isActive: true,
-      ...(category ? { category } : { NOT: { category: { startsWith: "onboarding-doc" } } }),
+      ...(category ? { category } : { NOT: [{ category: { startsWith: "onboarding-doc" } }, { category: "fact" }] }),
     },
     orderBy: [{ category: "asc" }, { createdAt: "asc" }],
   });
@@ -566,10 +571,38 @@ async function saveRule(projectId: string, params: Record<string, unknown>) {
   const content = String(params.content || "").trim();
   if (!title || !content) return NextResponse.json({ ok: false, error: "title and content required" });
   const category = String(params.category || "rule");
+  if (category === "fact") return NextResponse.json({ ok: false, error: "Факти з датами зберігай через save_fact (потрібні topic і дати дії), не save_rule." });
   const entry = await prisma.knowledgeEntry.create({
     data: { projectId, category, title, content, addedBy: "bot" },
   });
   return NextResponse.json({ ok: true, id: entry.id, title: entry.title });
+}
+
+// ── Факти з датами (актуально / застаріло) ─────────────────────────────────
+// Новина про ТЕ САМЕ (та сама topic) не додається поруч зі старою, а замінює її. Старе лишається
+// в БД (сторінка «Актуальна інформація»), але в промпти й вектор не потрапляє. Логіка — @/lib/factsDb.
+async function saveFact(projectId: string, params: Record<string, unknown>) {
+  const r = await saveFactCore(projectId, { ...params, addedBy: "bot" });
+  if (!r.ok) return NextResponse.json(r);
+  return NextResponse.json({
+    ok: true, id: r.id, status: r.status, replaced: r.replaced,
+    stalePosts: r.stale.length, stalePostNumbers: r.stale.map((x) => x.number),
+    note: r.stale.length ? "Є заплановані пости зі старим формулюванням — виправ їх через edit_post (find_stale_posts покаже список)." : undefined,
+  });
+}
+
+async function getFacts(projectId: string, params: Record<string, unknown>) {
+  const r = await listFactsCore(projectId, String(params.status || "active"));
+  return NextResponse.json({ ok: true, today: r.today, count: r.facts.length, facts: r.facts, text: r.text });
+}
+
+async function expireFact(projectId: string, params: Record<string, unknown>) {
+  return NextResponse.json(await expireFactCore(projectId, params));
+}
+
+async function findStalePosts(projectId: string) {
+  const posts = await collectStalePosts(projectId);
+  return NextResponse.json({ ok: true, count: posts.length, posts });
 }
 
 // Re-send a post's already-generated image(s) directly to the Telegram chat.
