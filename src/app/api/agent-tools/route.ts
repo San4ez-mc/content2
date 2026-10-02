@@ -8,6 +8,7 @@ import { scanWriting } from "@/lib/writingGate";
 import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 import { saveFactCore, listFactsCore, expireFactCore, collectStalePosts } from "@/lib/factsDb";
+import { syncStaticToVector } from "@/lib/vector-sync";
 
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
@@ -74,6 +75,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_facts": return await getFacts(projectId, params);
       case "expire_fact": return await expireFact(projectId, params);
       case "find_stale_posts": return await findStalePosts(projectId);
+      case "sync_vector": return NextResponse.json(await syncStaticToVector(projectId));
       case "get_topics": return await getTopics(projectId, params);
       case "get_structures": return await getStructures(projectId, params);
       case "get_network_rules": return await getNetworkRules(projectId, params);
@@ -466,7 +468,9 @@ async function getRules(projectId: string, params: Record<string, unknown>) {
     orderBy: [{ category: "asc" }, { createdAt: "asc" }],
   });
   const rules = entries.map((e) => `### ${e.title}\n${e.content}`).join("\n\n");
-  return NextResponse.json({ ok: true, count: entries.length, rules });
+  // withFacts=1 — додатково віддати блок АКТУАЛЬНІ ФАКТИ (для окремих воронок, що читають лише get_rules)
+  const facts = params.withFacts ? (await listFactsCore(projectId, "active")).text : undefined;
+  return NextResponse.json({ ok: true, count: entries.length, rules, ...(facts !== undefined ? { facts } : {}) });
 }
 
 const short = (v: any, n = 160) => { const s = String(v || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
