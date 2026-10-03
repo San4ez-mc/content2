@@ -880,7 +880,21 @@ async function pickRotatedPalette(projectId: string): Promise<string> {
   return PALETTES[(idx + 1) % PALETTES.length];
 }
 
-function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any, telegramChatId = "", telegramBotToken = "") {
+// Логотип проєкту для відео: останній файл бібліотеки з тегом "logo" (папка source). funnel_params.logo === false вимикає.
+async function findProjectLogoUrl(groupId: string): Promise<string | null> {
+  try {
+    const g = await prisma.postGroup.findUnique({ where: { id: groupId }, select: { projectId: true } });
+    if (!g) return null;
+    const m = await prisma.mediaItem.findFirst({ where: { projectId: g.projectId, tags: { path: "$", array_contains: "logo" } }, orderBy: { createdAt: "desc" } });
+    return m ? (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + m.filePath : null;
+  } catch { return null; }
+}
+
+async function fireGeneration(itemId: string, groupId: string, funnelSlug: string, funnelParams: any, telegramChatId = "", telegramBotToken = "") {
+  if (/short-video/.test(funnelSlug) && !(funnelParams && (funnelParams.logoUrl || funnelParams.logo === false))) {
+    const logoUrl = await findProjectLogoUrl(groupId);
+    if (logoUrl) funnelParams = { ...(funnelParams || {}), logoUrl };
+  }
   const CONTENT2 = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
   const WH_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
   // ФІКС (2026-09-01): attempt раніше НІКОЛИ не передавався → завжди дефолтився на 1 у
