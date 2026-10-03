@@ -38,6 +38,7 @@ const empty = { topic: "", title: "", content: "", valid_from: "", valid_until: 
 export function FactsView({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<typeof empty | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const { data, isLoading } = useQuery<FactsResponse>({
@@ -52,17 +53,22 @@ export function FactsView({ projectId }: { projectId: string }) {
     if (!form) return;
     setError("");
     const res = await fetch("/api/facts", {
-      method: "POST",
+      method: editId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, ...form }),
+      body: JSON.stringify({ projectId, ...(editId ? { id: editId } : {}), ...form }),
     });
     if (!res.ok) { setError((await res.json().catch(() => ({}))).error || "Не вдалося зберегти"); return; }
-    setForm(null); refresh();
+    setForm(null); setEditId(null); refresh();
+  }
+
+  function startEdit(f: Fact) {
+    setError(""); setEditId(f.id);
+    setForm({ topic: f.topic || "", title: f.title, content: f.content, valid_from: f.validFrom || "", valid_until: f.validUntil || "", stale_markers: f.staleMarkers.join("\n") });
   }
 
   async function expire(f: Fact) {
     if (!confirm(`Позначити застарілим: «${f.title}»?`)) return;
-    await fetch("/api/facts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId, id: f.id }) });
+    await fetch("/api/facts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId, id: f.id, expire: true }) });
     refresh();
   }
 
@@ -79,7 +85,7 @@ export function FactsView({ projectId }: { projectId: string }) {
             Що зараз правда про продукт, а що вже ні{data ? ` · станом на ${fmt(data.today)}` : ""}. Нова інформація тієї ж теми автоматично замінює стару.
           </p>
         </div>
-        <button onClick={() => { setError(""); setForm({ ...empty }); }} className="btn-primary text-xs px-3 py-1">+ Новий факт</button>
+        <button onClick={() => { setError(""); setEditId(null); setForm({ ...empty }); }} className="btn-primary text-xs px-3 py-1">+ Новий факт</button>
       </div>
 
       <div className="flex-1 overflow-auto p-4 max-w-4xl space-y-6">
@@ -124,9 +130,12 @@ export function FactsView({ projectId }: { projectId: string }) {
                             <p className="text-[10px] text-fg-subtle mt-1">Не повинно звучати в постах: {f.staleMarkers.map((m) => `«${m}»`).join(", ")}</p>
                           )}
                         </div>
-                        {f.status !== "outdated" && (
-                          <button onClick={() => expire(f)} className="text-[11px] text-fg-muted hover:text-red-500 px-1 shrink-0" title="Позначити застарілим">Застаріло</button>
-                        )}
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <button onClick={() => startEdit(f)} className="text-[11px] text-fg-muted hover:text-fg px-1" title="Редагувати">✏️ Правити</button>
+                          {f.status !== "outdated" && (
+                            <button onClick={() => expire(f)} className="text-[11px] text-fg-muted hover:text-red-500 px-1" title="Позначити застарілим">Застаріло</button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -140,7 +149,7 @@ export function FactsView({ projectId }: { projectId: string }) {
       {form && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setForm(null)}>
           <div className="bg-canvas border border-border rounded-xl p-4 w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-semibold text-fg">Новий факт</p>
+            <p className="text-sm font-semibold text-fg">{editId ? "Редагувати факт" : "Новий факт"}</p>
             <div>
               <label className="text-xs text-fg-muted">Тема (за нею новий факт замінює старий)</label>
               <input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} placeholder="напр. тестування застосунку" className={input} autoFocus />
@@ -169,7 +178,7 @@ export function FactsView({ projectId }: { projectId: string }) {
             </div>
             {error && <p className="text-xs text-red-500">{error}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <button onClick={() => setForm(null)} className="text-xs px-3 py-1 text-fg-muted">Скасувати</button>
+              <button onClick={() => { setForm(null); setEditId(null); }} className="text-xs px-3 py-1 text-fg-muted">Скасувати</button>
               <button onClick={save} className="btn-primary text-xs px-3 py-1">Зберегти</button>
             </div>
           </div>

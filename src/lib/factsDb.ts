@@ -107,3 +107,28 @@ export async function collectStalePosts(projectId: string, today: string = today
   }
   return out;
 }
+
+/** Правка факту на місці (з UI): змінює текст/тему/дати/маркери, не створює нового запису й нічого не замінює. */
+export async function updateFactCore(
+  projectId: string,
+  p: { id?: unknown; title?: unknown; content?: unknown; topic?: unknown; valid_from?: unknown; valid_until?: unknown; stale_markers?: unknown },
+) {
+  const id = String(p.id || "");
+  const existing = id ? await prisma.knowledgeEntry.findFirst({ where: { id, projectId, category: "fact" } }) : null;
+  if (!existing) return { ok: false as const, error: "Факт не знайдено" };
+  const data: any = {};
+  if (p.title !== undefined) { const v = String(p.title).trim(); if (!v) return { ok: false as const, error: "title не може бути порожнім" }; data.title = v; }
+  if (p.content !== undefined) { const v = String(p.content).trim(); if (!v) return { ok: false as const, error: "content не може бути порожнім" }; data.content = v; }
+  if (p.topic !== undefined) data.topic = String(p.topic).trim() || null;
+  if (p.stale_markers !== undefined) data.staleMarkers = String(p.stale_markers).trim() || null;
+  for (const [key, field] of [["valid_from", "validFrom"], ["valid_until", "validUntil"]] as const) {
+    const raw = (p as any)[key];
+    if (raw === undefined) continue;
+    if (raw === "" || raw === null) { data[field] = null; continue; }
+    const d = parseDay(raw);
+    if (!d) return { ok: false as const, error: `${key}: формат YYYY-MM-DD або DD.MM.YY` };
+    data[field] = new Date(d);
+  }
+  await prisma.knowledgeEntry.update({ where: { id }, data });
+  return { ok: true as const };
+}
