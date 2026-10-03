@@ -885,7 +885,7 @@ async function findProjectLogoUrl(groupId: string): Promise<string | null> {
   try {
     const g = await prisma.postGroup.findUnique({ where: { id: groupId }, select: { projectId: true } });
     if (!g) return null;
-    const m = await prisma.mediaItem.findFirst({ where: { projectId: g.projectId, tags: { path: "$", array_contains: "logo" } }, orderBy: { createdAt: "desc" } });
+    const m = await prisma.mediaItem.findFirst({ where: { projectId: g.projectId, tags: { path: "$", array_contains: "logo" } as any }, orderBy: { createdAt: "desc" } });
     return m ? (process.env.NEXTAUTH_URL || "https://content2.fineko.space") + m.filePath : null;
   } catch { return null; }
 }
