@@ -103,7 +103,7 @@ export function derivedStaleMarkers(outdated: { title: string; content: string }
   const keep = String(currentText || "").toLowerCase();
   const out = new Set<string>();
   // RegExp(...) а не літерал: tsconfig target < es6 не знає прапорця u, а Node (runtime) знає
-  const re = new RegExp("(?:останн\p{L}*\s+)?(?<![\d.])\d{1,3}\s+\p{L}{3,}", "giu");
+  const re = new RegExp(String.raw`(?:останн\p{L}*\s+)?(?<![\d.])\d{1,3}\s+\p{L}{3,}`, "giu");
   for (const f of outdated) {
     const text = `${f.title}\n${f.content}`;
     for (const m of Array.from(text.matchAll(re))) {
