@@ -102,7 +102,8 @@ export function factsPromptBlock(facts: FactLike[], today: string = todayKyiv())
 export function derivedStaleMarkers(outdated: { title: string; content: string }[], currentText: string): string[] {
   const keep = String(currentText || "").toLowerCase();
   const out = new Set<string>();
-  const re = /(?:останн\p{L}*\s+)?(?<![\d.])\d{1,3}\s+\p{L}{3,}/giu;
+  // RegExp(...) а не літерал: tsconfig target < es6 не знає прапорця u, а Node (runtime) знає
+  const re = new RegExp("(?:останн\p{L}*\s+)?(?<![\d.])\d{1,3}\s+\p{L}{3,}", "giu");
   for (const f of outdated) {
     const text = `${f.title}\n${f.content}`;
     for (const m of Array.from(text.matchAll(re))) {
