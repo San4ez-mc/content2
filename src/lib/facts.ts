@@ -93,3 +93,22 @@ export function factsPromptBlock(facts: FactLike[], today: string = todayKyiv())
   if (upcoming.length) out.push(`\nЗАПЛАНОВАНО НА МАЙБУТНЄ (говорити як про те, що ще лише буде, не як про вже наявне):\n${upcoming.map(line).join("\n")}`);
   return out.join("\n");
 }
+
+/**
+ * Автоматичні маркери застарілого: числові звороти зі СТАРИХ фактів («10 тестувальників», «останніх 5»), яких уже нема в діючих.
+ * Бот сам добирає stale_markers нерівно (на KIRO пропустив «останніх 5» і «вже 10» у 7 постах), тому детермінований
+ * шар додатково бере з вичерпаного факту все, що виглядає як число + слово, і шукає це в запланованих постах.
+ */
+export function derivedStaleMarkers(outdated: { title: string; content: string }[], currentText: string): string[] {
+  const keep = String(currentText || "").toLowerCase();
+  const out = new Set<string>();
+  const re = /(?:останн\p{L}*\s+)?(?<![\d.])\d{1,3}\s+\p{L}{3,}/giu;
+  for (const f of outdated) {
+    const text = `${f.title}\n${f.content}`;
+    for (const m of Array.from(text.matchAll(re))) {
+      const phrase = m[0].toLowerCase().replace(/\s+/g, " ").trim();
+      if (!keep.includes(phrase)) out.add(phrase);
+    }
+  }
+  return Array.from(out);
+}

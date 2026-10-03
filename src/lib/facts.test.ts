@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { factStatus, factsPromptBlock, parseDay, fmtDay, dayBefore, todayKyiv, sameTopic, splitMarkers, findStaleMarkers } from "./facts";
+import { factStatus, factsPromptBlock, parseDay, fmtDay, dayBefore, todayKyiv, sameTopic, splitMarkers, findStaleMarkers, derivedStaleMarkers } from "./facts";
 
 const base = { title: "T", content: "C", isActive: true };
 
@@ -66,5 +66,19 @@ describe("factsPromptBlock", () => {
     expect(block).toContain("02.10.26");
     expect(block).toContain("ЗАПЛАНОВАНО");
     expect(block).not.toContain("15 тестувальників");
+  });
+});
+
+describe("derivedStaleMarkers", () => {
+  const old = [{ title: "10 тестувальників є, потрібні останні 5", content: "Станом на 02.10.2026 у тестуванні вже 10 тестувальників. Потрібно зібрати 15 — далі 14-денний період і реліз після 100 користувачів." }];
+  it("бере числові звороти зі старого факту, яких немає в діючих", () => {
+    const m = derivedStaleMarkers(old, "Знайшов близько 20 тестувальників; триває 14-денний період; реліз після 100 користувачів");
+    expect(m).toContain("10 тестувальників");
+    expect(m).toContain("останні 5");
+    expect(m).not.toContain("100 користувачів"); // є й у діючому
+  });
+  it("не чіпає роки й дати", () => {
+    const m = derivedStaleMarkers([{ title: "T", content: "Станом на 02.10.2026 застосунок готується" }], "інше");
+    expect(m.some((x) => /2026/.test(x))).toBe(false);
   });
 });

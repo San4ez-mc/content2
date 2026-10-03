@@ -1,6 +1,6 @@
 // Робота з фактами в БД (спільна для agent-tools — бот — і /api/facts — UI).
 import { prisma } from "./prisma";
-import { factStatus, factsPromptBlock, todayKyiv, parseDay, dayOf, dayBefore, sameTopic, splitMarkers, findStaleMarkers, fmtDay } from "./facts";
+import { factStatus, factsPromptBlock, todayKyiv, parseDay, dayOf, dayBefore, sameTopic, splitMarkers, findStaleMarkers, fmtDay, derivedStaleMarkers } from "./facts";
 
 export const factView = (f: any, today: string) => ({
   id: f.id as string, topic: f.topic as string | null, title: f.title as string, content: f.content as string,
@@ -92,7 +92,11 @@ export async function listFactsCore(projectId: string, status: string = "active"
 /** Пости (чернетки/заплановані, дата ≥ сьогодні), де лишилась фраза зі старого формулювання. */
 export async function collectStalePosts(projectId: string, today: string = todayKyiv()) {
   const facts = await allFacts(projectId);
-  const markers = Array.from(new Set(facts.filter((f) => factStatus(f, today) !== "scheduled").flatMap((f) => splitMarkers(f.staleMarkers))));
+  const explicit = facts.filter((f) => factStatus(f, today) !== "scheduled").flatMap((f) => splitMarkers(f.staleMarkers));
+  // + детерміновані маркери зі вичерпаних фактів (числові звороти, яких уже нема в діючих)
+  const current = facts.filter((f) => factStatus(f, today) !== "outdated").map((f) => `${f.title}\n${f.content}`).join("\n");
+  const derived = derivedStaleMarkers(facts.filter((f) => factStatus(f, today) === "outdated"), current);
+  const markers = Array.from(new Set([...explicit, ...derived]));
   const out: { number: number; date: string; markers: string[] }[] = [];
   if (!markers.length) return out;
   const groups = await prisma.postGroup.findMany({
