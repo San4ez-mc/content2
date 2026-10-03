@@ -30,6 +30,10 @@ export const STRUCTURES: Option[] = [
   { id: "carousel", label: "Карусель", hint: "Слайд1=хук → кроки → CTA" },
   { id: "reels", label: "Рілс", hint: "Hook 3с → обіцянка → 3 біти → CTA" },
   { id: "stories", label: "Сторіз", hint: "Хук-стікер → думка → свайп" },
+  { id: "vid_cartoon_story", label: "Відео: мультик-сюжет", hint: "Хук-біль → ускладнення → поворот → результат → CTA (15 с)" },
+  { id: "vid_kinetic_facts", label: "Відео: текст під біт", hint: "4-5 фраз-ударів, що наростають (12 с)" },
+  { id: "vid_organizer_story", label: "Відео: біль організатора", hint: "Порожня зала → додаток → повна зала → CTA" },
+  { id: "vid_pov_mini_film", label: "Відео: міні-фільм POV", hint: "Настрій і музика, мінімум слів, 1 AI-сцена" },
 ];
 
 // Тип хука — зберігається як префікс/маркер; текст — у hookA/hookB

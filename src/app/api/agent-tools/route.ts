@@ -10,6 +10,7 @@ import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 import { pickNetwork, networkKeyCandidates } from "@/lib/platformKeys";
 import { saveFactCore, listFactsCore, expireFactCore, collectStalePosts } from "@/lib/factsDb";
 import { syncStaticToVector } from "@/lib/vector-sync";
+import { seedDefaultStructures } from "@/lib/seedStructures";
 
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
@@ -77,6 +78,8 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "expire_fact": return await expireFact(projectId, params);
       case "find_stale_posts": return await findStalePosts(projectId);
       case "sync_vector": return NextResponse.json(await syncStaticToVector(projectId));
+      // Адмін-дія: догнати проєкту канонічні структури (нові відео-структури) — ідемпотентно
+      case "seed_structures": return NextResponse.json({ ok: true, ...(await seedDefaultStructures(projectId)) });
       // Адмін-дія (не в інструментах агента): прибрати факти проєкту — для QA-прогонів.
       case "delete_facts": {
         const r = await prisma.knowledgeEntry.deleteMany({ where: { projectId, category: "fact", ...(params.id ? { id: String(params.id) } : {}) } });
