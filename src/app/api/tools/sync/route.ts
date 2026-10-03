@@ -83,6 +83,17 @@ const TOOL_DESCRIPTIONS: Record<string, ToolDesc> = {
       { key: "fields", label: "Поля для підставлення (JSON)", type: "json", required: true },
     ],
   },
+  "content-short-video": {
+    aiDescription:
+      "Збирає КОРОТКЕ ВЕРТИКАЛЬНЕ ВІДЕО (9:16, 10-20 с) БЕЗ людини в кадрі з готового сценарію: для кожної сцени AI-ілюстрація/кадр у єдиному стилі, рух камери, великий текст на екрані, музика під ритм. Для TikTok, YouTube Shorts, Instagram Reels. Сценарій передається в funnel_params.scenes (кожна сцена: visual — опис кадру англійською, text — напис українською на екрані, sec — тривалість), music.prompt — настрій музики, style — спільний стиль усіх кадрів. Поле content поста = підпис (caption) з хештегами.",
+    exampleOutput: "MP4 9:16, 12-18 секунд: 4-6 сцен у єдиному мультяшному стилі, великі субтитри, фонова музика. Перша сцена — хук, остання — CTA.",
+    paramsSchema: [
+      { key: "scenes", label: "Сцени (JSON-масив {visual, text, sec, motion})", type: "json", required: true },
+      { key: "style", label: "Єдиний стиль усіх кадрів (англійською)", type: "text", required: true },
+      { key: "music", label: "Музика ({prompt})", type: "json", required: false },
+      { key: "coverTitle", label: "Заголовок обкладинки", type: "text", required: false },
+    ],
+  },
   "content-video-broll": {
     aiDescription:
       "Генерує AI B-roll відео через Kling. Підходить для: Reels, TikTok, коли потрібне коротке відео замість статичного зображення.",

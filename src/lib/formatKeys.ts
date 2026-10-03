@@ -11,7 +11,7 @@ const FORMAT_ALIASES: Record<string, string> = {
   reel: "reel", reels: "reel",
   carousel: "carousel",
   thread: "thread", thread_chain: "thread", thread_short: "thread", thread_question: "thread", chain: "thread",
-  short: "short", shorts: "short",
+  short: "short", shorts: "short", video: "reel", tiktok_video: "reel", youtube_short: "short",
   slideshow: "slideshow",
 };
 

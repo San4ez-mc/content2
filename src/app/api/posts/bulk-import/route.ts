@@ -1,3 +1,4 @@
+import { pickNetwork } from "@/lib/platformKeys";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
@@ -30,23 +31,8 @@ export async function POST(req: NextRequest) {
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
-  const networkByPlatform = new Map(networks.map((n) => [n.platformKey, n]));
 
-  const PLATFORM_MAP: Record<string, string> = {
-    threads: "threads",
-    instagram: "instagram_posts",
-    instagram_post: "instagram_posts",
-    stories: "instagram_stories",
-    instagram_stories: "instagram_stories",
-    reels: "instagram_reels",
-    instagram_reels: "instagram_reels",
-    carousel: "instagram_posts",
-    instagram_carousel: "instagram_posts",
-    linkedin: "linkedin",
-    tiktok: "tiktok",
-    telegram: "telegram",
-    telegram_post: "telegram",
-  };
+
 
   const AUDIENCE_VALID = new Set(["cold", "warm1", "warm2", "hot1", "hot2"]);
 
@@ -161,8 +147,7 @@ export async function POST(req: NextRequest) {
   }
 
   for (const p of posts) {
-    const platformKey = PLATFORM_MAP[p.platform] || p.platform || "instagram_posts";
-    let network = networkByPlatform.get(platformKey);
+    let network = pickNetwork(networks, p.platform);
     if (!network) network = networks.find((n) => n.isEnabled) || networks[0];
     if (!network) continue;
 
@@ -286,7 +271,7 @@ export async function POST(req: NextRequest) {
       funnelSlug: derivedFunnelSlug,
       funnelParams: funnelParams || buildParamsFromLegacy(p),
       content: p.content || "",
-      platform: platformKey,
+      platform: network.platformKey,
     });
   }
 
@@ -388,6 +373,7 @@ function deriveSlugFromMediaType(mediaType: string | undefined): string | null {
     carousel: "content-carousel",
     template: "content-image-template",
     broll: "content-video-broll",
+    short_video: "content-short-video",
     text_only: "text_only",
   };
   if (!mediaType) return null;

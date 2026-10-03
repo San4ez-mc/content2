@@ -7,6 +7,7 @@ import { vectorSearch } from "@/lib/vector";
 import { scanWriting } from "@/lib/writingGate";
 import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
+import { pickNetwork, networkKeyCandidates } from "@/lib/platformKeys";
 import { saveFactCore, listFactsCore, expireFactCore, collectStalePosts } from "@/lib/factsDb";
 import { syncStaticToVector } from "@/lib/vector-sync";
 
@@ -98,18 +99,6 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
   }
 }
 
-const PLATFORM_MAP: Record<string, string> = {
-  threads: "threads",
-  instagram: "instagram_posts",
-  instagram_post: "instagram_posts",
-  stories: "instagram_stories",
-  instagram_stories: "instagram_stories",
-  reels: "instagram_reels",
-  instagram_reels: "instagram_reels",
-  linkedin: "linkedin",
-  tiktok: "tiktok",
-  telegram: "telegram",
-};
 
 function dateFilter(params: Record<string, unknown>) {
   const f: any = {};
@@ -123,8 +112,7 @@ function platformWhere(projectId: string, params: Record<string, unknown>) {
   const pd = dateFilter(params);
   if (pd) where.postDate = pd;
   if (params.platform) {
-    const key = PLATFORM_MAP[String(params.platform)] || String(params.platform);
-    where.socialNetwork = { platformKey: { in: [key, String(params.platform)] } };
+    where.socialNetwork = { platformKey: { in: networkKeyCandidates(params.platform) } };
   }
   return where;
 }
@@ -191,9 +179,8 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
     }
   }
 
-  const platformKey = PLATFORM_MAP[String(params.platform)] || String(params.platform || "instagram_posts");
   const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
-  const network = networks.find((n) => n.platformKey === platformKey) || networks.find((n) => n.isEnabled) || networks[0];
+  const network = pickNetwork(networks, params.platform) || networks.find((n) => n.isEnabled) || networks[0];
   if (!network) return NextResponse.json({ ok: false, error: "No networks in project" });
 
   const funnelSlug = (params.funnel_slug as string) || null;
@@ -311,7 +298,7 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
 
   // Per-post deep-link tracking: swap any lead-magnet base link for a unique tracked link.
   const tracked = await injectTrackedLinks({
-    projectId, postItemId: group.items[0].id, postGroupId: group.id, postNumber: group.number, platform: platformKey, content: String(params.content || ""),
+    projectId, postItemId: group.items[0].id, postGroupId: group.id, postNumber: group.number, platform: network.platformKey, content: String(params.content || ""),
   });
   if (tracked !== String(params.content || "")) {
     await prisma.postItem.update({ where: { id: group.items[0].id }, data: { content: tracked } }).catch(() => {});
@@ -698,7 +685,7 @@ async function getStructures(projectId: string, params: Record<string, unknown> 
 // Правила соцмереж (тон/довжина/хештеги/алгоритм) + куди йде CTA-лінк (linkPlacement).
 async function getNetworkRules(projectId: string, params: Record<string, unknown> = {}) {
   const platform = params.platform ? String(params.platform) : "";
-  const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: platform } : {}) }, orderBy: { sortOrder: "asc" } });
+  const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: { in: networkKeyCandidates(platform) } } : {}) }, orderBy: { sortOrder: "asc" } });
   const LINK_TXT: Record<string, string> = { comment: "у перший коментар", inline: "прямо в тексті", bio: "у шапку профілю (в пості лінк неактивний)", description: "в опис" };
   const text = nets.filter((n) => n.rules || n.linkPlacement).map((n) => {
     const link = n.linkPlacement ? ` Посилання (CTA): ${LINK_TXT[n.linkPlacement] || n.linkPlacement}.` : "";
@@ -710,7 +697,7 @@ async function getNetworkRules(projectId: string, params: Record<string, unknown
 // Формати по мережах (контейнер + дозволені медіа-типи + aspect). Опційний platform.
 async function getFormats(projectId: string, params: Record<string, unknown> = {}) {
   const platform = params.platform ? String(params.platform) : "";
-  const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: platform } : {}) }, select: { id: true, platformKey: true } });
+  const nets = await prisma.socialNetwork.findMany({ where: { projectId, isEnabled: true, ...(platform ? { platformKey: { in: networkKeyCandidates(platform) } } : {}) }, select: { id: true, platformKey: true } });
   const netById = new Map(nets.map((n) => [n.id, n.platformKey]));
   const formats = await prisma.format.findMany({ where: { projectId, isActive: true, socialNetworkId: { in: nets.map((n) => n.id) } }, orderBy: { sortOrder: "asc" } });
   const text = formats.map((f) => {
@@ -726,7 +713,7 @@ const MIN_PATTERN_SAMPLE = 3;
 async function getTopPatterns(projectId: string, params: Record<string, unknown> = {}) {
   const platform = params.platform ? String(params.platform) : "";
   const groups = await prisma.postGroup.findMany({
-    where: { projectId, ...(platform ? { socialNetwork: { platformKey: platform } } : {}) },
+    where: { projectId, ...(platform ? { socialNetwork: { platformKey: { in: networkKeyCandidates(platform) } } } : {}) },
     select: { intent: true, structureId: true, hookSelected: true, evidenceType: true, scores: true },
   });
   const elements: Record<string, string> = { intent: "intent", structure: "structureId", hook: "hookSelected", evidence: "evidenceType" };

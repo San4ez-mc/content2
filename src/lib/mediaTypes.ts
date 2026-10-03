@@ -16,7 +16,7 @@ export const MEDIA_TYPES: MediaTypeDef[] = [
   { key: "image", label: "Фото + текст", funnelSlug: "content-ai-bg", hasText: true, sources: ["auto", "storage"], extraFields: ["palette", "aspect"] },
   { key: "text_on_image", label: "Текст на фото", funnelSlug: "content-photo-text", hasText: true, sources: ["auto", "storage"], extraFields: ["template", "aspect"] },
   { key: "carousel", label: "Карусель (кілька фото)", funnelSlug: "content-carousel", hasText: true, sources: ["auto", "storage"], extraFields: ["slides", "palette", "aspect"] },
-  { key: "video", label: "Відео + текст", funnelSlug: "content-video-broll", hasText: true, sources: ["auto", "storage"], extraFields: ["duration", "subtitles", "thumbnail", "music", "aspect"] },
+  { key: "video", label: "Відео + текст", funnelSlug: "content-short-video", hasText: true, sources: ["auto", "storage"], extraFields: ["duration", "subtitles", "thumbnail", "music", "aspect"] },
   { key: "file", label: "Файл", funnelSlug: null, hasText: true, sources: ["storage"], extraFields: ["file"] },
   { key: "image_music", label: "Фото під музику", funnelSlug: "content-carousel", hasText: false, sources: ["auto", "storage"], extraFields: ["music", "aspect", "duration"] },
 ];

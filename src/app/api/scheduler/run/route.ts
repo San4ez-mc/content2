@@ -147,12 +147,48 @@ export async function POST(req: NextRequest) {
     // Found 2026-10-01: 6 such orphans on a real KIRO batch, still unpublished only
     // because no cron tick had hit their window yet. Never treat an empty/still-
     // generating post as due, regardless of how it ended up "scheduled".
-    const candidates = candidatesRaw.filter((g) => {
+    const candidatesText = candidatesRaw.filter((g) => {
       const item = g.items[0];
       return item && item.content && item.content.trim().length > 0 && item.generationStatus !== "generating_text";
     });
 
-    const due = hasAnySlots ? (slotHit ? candidates : []) : candidates.filter((g) => withinWindow(g.scheduleTime));
+    // Відео-пост (рілс/шортс/слайдшоу) без готового відео публікувати не можна: інакше в мережу піде
+    // голий підпис. Поки відео генерується — чекаємо (і наздоганяємо після часу, див. нижче); якщо
+    // генерація впала — повертаємо пост у чернетки й сповіщаємо, а не мовчимо.
+    const needsVideo = (g: (typeof candidatesText)[number]) =>
+      ["reel", "short", "slideshow"].includes(String(g.formatKey || "")) ||
+      /video|short/.test(String(g.items[0]?.funnelSlug || ""));
+    const candidates: typeof candidatesText = [];
+    for (const g of candidatesText) {
+      if (!needsVideo(g)) { candidates.push(g); continue; }
+      const st = g.items[0].generationStatus;
+      if (st === "done" && g.items[0].imagePath) candidates.push(g);
+      else if (st === "failed") {
+        await prisma.postGroup.update({ where: { id: g.id }, data: { status: "draft" } });
+        const members = await prisma.projectUser.findMany({ where: { projectId: g.projectId }, select: { userId: true } });
+        for (const m of members) {
+          await prisma.notification.create({
+            data: { projectId: g.projectId, userId: m.userId, type: "publish_failed", postGroupId: g.id, title: `Відео поста #${g.number} не згенерувалось`, body: String(g.items[0].generationError || "generation failed").slice(0, 500) },
+          }).catch(() => {});
+        }
+      }
+      // pending/generating → пропускаємо, наступний тік перевірить знову
+    }
+    const timePassed = (t?: string | null) => {
+      if (!t) return false;
+      const [h, m] = t.split(":").map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return false;
+      return currentMin >= h * 60 + m;
+    };
+
+    const due = hasAnySlots
+      ? (slotHit ? candidates : [])
+      // відео могло дорендеритись уже ПІСЛЯ свого часу — для нього «час настав або минув сьогодні»
+      // (публікація однократна завдяки унікальному запису в publication_queue)
+      : candidates.filter((g) => {
+          const autoPost = g.socialNetwork.postDirectly && !!g.socialNetwork.autopostSlug; // лише автопост має «замок» publication_queue
+          return needsVideo(g) && autoPost ? timePassed(g.scheduleTime) : withinWindow(g.scheduleTime);
+        });
     if (due.length === 0) continue;
 
     // Per-network delivery: Telegram digest and/or direct autopost. Direct posts are claimed in
@@ -193,14 +229,18 @@ export async function POST(req: NextRequest) {
             sendToTelegram: tg,
             postDirectly: auto,
             autopostSlug: auto ? g.socialNetwork.autopostSlug : null,
+            hook: g.hookA || null,
+            formatKey: g.formatKey || null,
             items: g.items.map((i) => ({
               content: i.content,
               imagePath: i.imagePath,
+              // відео зберігається в imagePath: віддаємо явний тип, щоб публікатор не слав mp4 як картинку
+              mediaKind: i.imagePath ? (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(i.imagePath) ? "video" : "image") : null,
               isCta: i.isCta,
             })),
           })),
           today: todayStr,
-          callbackUrl: `${process.env.NEXTAUTH_URL}/api/webhooks/scheduler-done`,
+          callbackUrl: `${process.env.NEXTAUTH_URL}/api/webhooks/scheduler-done?token=${encodeURIComponent(SCHEDULER_TOKEN)}`,
         }),
       });
 

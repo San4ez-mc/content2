@@ -1,3 +1,4 @@
+import { pickNetwork } from "@/lib/platformKeys";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
@@ -5,21 +6,6 @@ import { broadcastToProject } from "@/lib/sse";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 
 // Platform/type maps mirror bulk-import so placeholders match the posts that fill them.
-const PLATFORM_MAP: Record<string, string> = {
-  threads: "threads",
-  instagram: "instagram_posts",
-  instagram_post: "instagram_posts",
-  stories: "instagram_stories",
-  instagram_stories: "instagram_stories",
-  reels: "instagram_reels",
-  instagram_reels: "instagram_reels",
-  carousel: "instagram_posts",
-  instagram_carousel: "instagram_posts",
-  linkedin: "linkedin",
-  tiktok: "tiktok",
-  telegram: "telegram",
-  telegram_post: "telegram",
-};
 
 const FORMAT_TYPE: Record<string, string> = {
   instagram_stories: "stories",
@@ -56,12 +42,10 @@ export async function POST(req: NextRequest) {
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
-  const networkByPlatform = new Map(networks.map((n) => [n.platformKey, n]));
 
   let created = 0;
   for (const t of tasks) {
-    const platformKey = PLATFORM_MAP[t.platform] || PLATFORM_MAP[t.format] || t.platform || "instagram_posts";
-    let network = networkByPlatform.get(platformKey);
+    let network = pickNetwork(networks, t.platform) || pickNetwork(networks, t.format);
     if (!network) network = networks.find((n) => n.isEnabled) || networks[0];
     if (!network) continue;
 
