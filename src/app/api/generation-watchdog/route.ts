@@ -48,8 +48,13 @@ async function run(req: NextRequest) {
       ? `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`
       : "";
 
+    // Відео рендериться у черзі мікросервісу short-video (по одному, 1-6 хв кожне): план із десятків роликів
+    // чекає годину+. Тому для відео — довший таймаут (90 хв) і БЕЗ авто-повтору (повтор дублював би завдання в черзі).
+    const isVideo = /video/.test(String(item.funnelSlug || ""));
+    if (isVideo && item.updatedAt > new Date(Date.now() - 90 * 60 * 1000)) continue;
+
     // Ф2.3: перший таймаут → один авто-retry (перезапуск воронки) + скидання таймера.
-    if (!fp._wdRetried && item.funnelSlug) {
+    if (!fp._wdRetried && item.funnelSlug && !isVideo) {
       try {
         await fetch(`https://flows.fineko.space/webhook/bot/${item.funnelSlug}`, {
           method: "POST",
@@ -64,7 +69,7 @@ async function run(req: NextRequest) {
     }
 
     // Другий таймаут (або нема воронки для повтору) → failed.
-    const errText = `Таймаут генерації — не завершилось за ${minutes} хв (після повтору).`;
+    const errText = isVideo ? `Таймаут генерації відео — не завершилось за 90 хв.` : `Таймаут генерації — не завершилось за ${minutes} хв (після повтору).`;
     await prisma.postItem.update({
       where: { id: item.id },
       data: { generationStatus: "failed", generationError: errText },
