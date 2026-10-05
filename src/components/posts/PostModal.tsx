@@ -98,6 +98,8 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   });
   const [scoreSaved, setScoreSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState("");
 
   async function saveReactions() {
     await fetch(`/api/posts/${group.id}/score`, {
@@ -142,7 +144,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
     setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
   }
 
-  async function save() {
+  async function save(silent = false) {
     setSaving(true);
     try {
       await fetch(`/api/posts/${group.id}`, {
@@ -159,9 +161,41 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
           items,
         }),
       });
-      onUpdate();
+      if (!silent) onUpdate();
     } finally {
       setSaving(false);
+    }
+  }
+
+  const canPublish = ["tiktok", "youtube", "threads"].includes(group.socialNetwork.platformKey);
+  async function publishNow(force = false) {
+    const net = group.socialNetwork.name;
+    const tiktokNote = group.socialNetwork.platformKey === "tiktok"
+      ? "\n\nПоки додаток TikTok не пройшов аудит, відео публікується лише приватно (видиме тільки власнику акаунта)."
+      : "";
+    if (!force && !confirm(`Опублікувати зараз у «${net}»?${tiktokNote}`)) return;
+    setPublishing(true);
+    setPublishMsg("");
+    try {
+      await save(true); // спершу зберігаємо правки з модалки, щоб публікувалась актуальна версія
+      const r = await fetch(`/api/posts/${group.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 409 && j.code === "already_published") {
+        if (confirm("Цей пост уже опубліковано. Опублікувати ще раз?")) { setPublishing(false); return publishNow(true); }
+        setPublishMsg("Скасовано: пост уже опубліковано");
+      } else if (!r.ok || !j.ok) {
+        setPublishMsg("⚠️ " + (j.error || `Помилка ${r.status}`));
+      } else {
+        setPublishMsg("✅ " + (j.message || "Публікацію запущено"));
+      }
+    } catch (e: any) {
+      setPublishMsg("⚠️ " + (e?.message || "Помилка мережі"));
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -761,9 +795,20 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
             🗑 Видалити
           </button>
           <div className="flex items-center gap-2">
+            {publishMsg && <span className="text-[11px] text-fg-muted max-w-[220px] truncate" title={publishMsg}>{publishMsg}</span>}
+            {canPublish && (
+              <button
+                onClick={() => publishNow(false)}
+                disabled={publishing || saving}
+                className="btn-ghost text-xs px-3 py-1.5 border border-border"
+                title={`Опублікувати зараз у ${group.socialNetwork.name}`}
+              >
+                {publishing ? "Публікація..." : "🚀 Опублікувати"}
+              </button>
+            )}
             <button onClick={onClose} className="btn-ghost text-xs px-3 py-1.5">Скасувати</button>
             <button
-              onClick={save}
+              onClick={() => save()}
               disabled={saving}
               className="btn-primary text-xs px-4 py-1.5"
             >
