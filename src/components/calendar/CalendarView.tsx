@@ -509,13 +509,21 @@ function PostChip({ group, dateStr, onClick, bulkSelected, onBulkSelect }: {
         {bulkSelected && <span className="text-white text-[8px] font-bold">✓</span>}
       </div>
       {/* Image thumbnail */}
-      {hasImage && (
+      {hasImage && (/\.(mp4|mov|webm)(\?|$)/i.test(firstItem.imagePath!) ? (
+        <video
+          src={`${firstItem.imagePath!}#t=0.8`}
+          muted
+          playsInline
+          preload="metadata"
+          className="w-8 h-8 rounded object-cover shrink-0 bg-black"
+        />
+      ) : (
         <img
           src={firstItem.imagePath!}
           alt=""
           className="w-8 h-8 rounded object-cover shrink-0"
         />
-      )}
+      ))}
       {(isGenerating || isGeneratingText) && !hasImage && (
         <div className="w-8 h-8 rounded skeleton shrink-0" />
       )}

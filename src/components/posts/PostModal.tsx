@@ -507,11 +507,21 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
             <div className="space-y-4">
               {activeItem?.imagePath ? (
                 <div className="relative group/img">
-                  <img
-                    src={activeItem.imagePath}
-                    alt="Post image"
-                    className="w-full max-h-72 object-contain rounded-xl border border-border"
-                  />
+                  {/\.(mp4|mov|webm)(\?|$)/i.test(activeItem.imagePath) ? (
+                    <video
+                      src={activeItem.imagePath}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full max-h-72 object-contain rounded-xl border border-border bg-black"
+                    />
+                  ) : (
+                    <img
+                      src={activeItem.imagePath}
+                      alt="Post image"
+                      className="w-full max-h-72 object-contain rounded-xl border border-border"
+                    />
+                  )}
                   <button
                     onClick={() => updateItem(activeItemIdx, { imagePath: null })}
                     className="absolute top-2 right-2 opacity-0 group-hover/img:opacity-100 transition-opacity btn-danger text-xs px-2 py-1"
