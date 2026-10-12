@@ -70,6 +70,6 @@ export async function POST(req: NextRequest) {
     projects.add(g.projectId);
     updated++;
   }
-  for (const pid of projects) broadcastToProject(pid, { type: "post_updated", source: "metrics" });
+  Array.from(projects).forEach((pid) => broadcastToProject(pid, { type: "post_updated", source: "metrics" }));
   return NextResponse.json({ ok: true, updated });
 }
