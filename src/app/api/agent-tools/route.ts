@@ -4,7 +4,7 @@ import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
 import { vectorSearch } from "@/lib/vector";
-import { scanWriting } from "@/lib/writingGate";
+import { scanWriting, lengthViolation } from "@/lib/writingGate";
 import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 import { pickNetwork, networkKeyCandidates } from "@/lib/platformKeys";
@@ -185,6 +185,16 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
   const network = pickNetwork(networks, params.platform) || networks.find((n) => n.isEnabled) || networks[0];
   if (!network) return NextResponse.json({ ok: false, error: "No networks in project" });
+
+  // Жорсткий ліміт довжини мережі (Threads 500): модель рахує символи неточно, тому перевіряє код.
+  const lenViolations = lengthViolation(network.platformKey, gateText);
+  if (lenViolations.length > 0) {
+    return NextResponse.json({
+      ok: false,
+      error: "Пост НЕ збережено — задовгий для мережі. Скороти текст і виклич create_post знову.",
+      violations: lenViolations.map((v) => v.detail),
+    });
+  }
 
   const funnelSlug = (params.funnel_slug as string) || null;
   let funnelParams: any = (params.funnel_params as any) || null;
@@ -501,6 +511,8 @@ async function checkWriting(params: Record<string, unknown>) {
   const text = String(params.text || "");
   if (!text.trim()) return NextResponse.json({ ok: true, pass: true, count: 0, violations: [], text: "Порожній текст." });
   const violations = scanWriting(text);
+  const lenOf = String(params.platform || "") ? lengthViolation(String(params.platform), text) : [];
+  violations.push(...lenOf);
   const summary = violations.length
     ? "Порушення стандарту письма:\n" + violations.map((v) => `• ${v.detail}`).join("\n")
     : "Стандарт письма пройдено, порушень немає.";

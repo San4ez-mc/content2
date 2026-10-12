@@ -71,3 +71,16 @@ describe("scanWriting (C3 grep-gate)", () => {
     expect(scanWriting("Друзі, є новина.").some((x) => x.type === "greeting_start")).toBe(true);
   });
 });
+
+describe("lengthViolation (ліміт Threads)", () => {
+  it("пропускає ≤500 і ловить >500 для Threads", async () => {
+    const { lengthViolation } = await import("./writingGate");
+    expect(lengthViolation("threads", "а".repeat(500))).toHaveLength(0);
+    expect(lengthViolation("threads", "а".repeat(501))).toHaveLength(1);
+    expect(lengthViolation("threads", "а".repeat(740))[0].detail).toContain("740");
+  });
+  it("інші мережі не обмежує", async () => {
+    const { lengthViolation } = await import("./writingGate");
+    expect(lengthViolation("telegram", "а".repeat(3000))).toHaveLength(0);
+  });
+});

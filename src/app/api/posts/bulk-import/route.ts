@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
-import { scanWriting } from "@/lib/writingGate";
+import { scanWriting, lengthViolation } from "@/lib/writingGate";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
     // C3 батч-критик: пост із порушеннями стандарту письма НЕ йде в графік —
     // тримаємо як draft (на перевірку), а не «scheduled» (авто-публікація).
     // Скелет — завжди draft (текст напишеться на фазі J-2); інакше critic вирішує.
-    const groupStatus = skeletonMode ? "draft" : (scanWriting(String(p.content || "")).length > 0 ? "draft" : "scheduled");
+    const groupStatus = skeletonMode ? "draft" : ((scanWriting(String(p.content || "")).length > 0 || lengthViolation(network.platformKey, String(p.content || "")).length > 0) ? "draft" : "scheduled");
 
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;

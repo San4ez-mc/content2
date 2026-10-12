@@ -42,3 +42,19 @@ export function scanWriting(text: string): Violation[] {
   for (const g of WGREETING) if (new RegExp(g + "(?![а-яіїєґ'])", "i").test(start)) violations.push({ type: "greeting_start", detail: `привітання на старті «${g}»` });
   return violations;
 }
+
+// Жорсткі ліміти довжини ОДНОГО тексту мережі. Модель не вміє точно рахувати символи (особливо кирилицю),
+// тому ліміт перевіряє код, а не промпт. Threads: 500 символів на пост (рахуються всі символи разом з пробілами);
+// понад — публікатор раніше мовчки обрізав текст посеред речення (виявлено 2026-10-12: 5 з 38 постів KIRO).
+const PLATFORM_CHAR_LIMITS: { re: RegExp; limit: number; name: string }[] = [
+  { re: /^threads/i, limit: 500, name: "Threads" },
+];
+
+export function lengthViolation(platformKey: string, text: string): Violation[] {
+  const rule = PLATFORM_CHAR_LIMITS.find((r) => r.re.test(String(platformKey || "")));
+  if (!rule) return [];
+  const len = Array.from(String(text || "").trim()).length; // кодові точки, як рахує Threads
+  return len > rule.limit
+    ? [{ type: "too_long", detail: `${rule.name}: ${len} символів при ліміті ${rule.limit} (скороти до ~${rule.limit - 50}; для довгої думки зроби ланцюжок з кількох постів, кожен ≤ ${rule.limit})` }]
+    : [];
+}
