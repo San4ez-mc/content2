@@ -15,12 +15,25 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { projectName, kind, data } = body as {
+  const { projectName, kind } = body as {
     projectId?: string; projectName?: string; kind?: string; data?: any;
   };
+  let data = (body as any).data;
+  // LLM-агент інколи шле data як JSON-РЯДОК замість обʼєкта — без парсингу save(topics) мовчки
+  // повертав created:0 і бот рапортував успіх, якого не було.
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch { /* лишаємо як є — нижче впаде з явною помилкою */ }
+  }
   const projectId = (body as any).projectId || req.nextUrl.searchParams.get("projectId") || undefined;
   if (!kind || !data) {
     return NextResponse.json({ error: "kind, data required" }, { status: 400 });
+  }
+  // Порожній список тем/продуктів — це помилка, а не «ок»: агент має це побачити й повторити.
+  if (kind === "topics" || kind === "products") {
+    const list = kind === "topics" ? (Array.isArray(data?.topics) ? data.topics : Array.isArray(data) ? data : []) : (Array.isArray(data?.products) ? data.products : Array.isArray(data) ? data : []);
+    if (!list.length) {
+      return NextResponse.json({ ok: false, error: `${kind}: порожній список — очікується data.${kind} = [ ... ] (обʼєкт, не рядок)` }, { status: 400 });
+    }
   }
 
   // Таргетинг проєкту: спершу явний projectId (не плодимо дублі), потім за назвою.
