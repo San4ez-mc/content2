@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
   if (!kind || !data) {
     return NextResponse.json({ error: "kind, data required" }, { status: 400 });
   }
+  // Рядок, що не розпарсився як JSON, — не «порожній артефакт з дефолтною назвою», а помилка.
+  if (typeof data !== "object") {
+    return NextResponse.json({ ok: false, error: "data має бути JSON-обʼєктом (не рядком і не обрізаним JSON); повтори виклик" }, { status: 400 });
+  }
   // Один обʼєкт замість списку (kind products/topics) — загортаємо, а не губимо.
   if (kind === "products" && data && !Array.isArray(data) && !Array.isArray(data.products) && data.name) data = { products: [data] };
   if (kind === "topics" && data && !Array.isArray(data) && !Array.isArray(data.topics) && data.title) data = { topics: [data] };
