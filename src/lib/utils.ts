@@ -75,9 +75,17 @@ export function formatDate(date: Date | string): string {
   return `${dd}.${mm}.${yy}`;
 }
 
+/** Зсув Києва від UTC у хвилинах на момент `now`: 180 влітку, 120 взимку (перехід на зимовий час — остання неділя жовтня). */
+export function kyivOffsetMinutes(now: Date = new Date()): number {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(now);
+  const g = (t: string) => Number(p.find((x) => x.type === t)!.value);
+  const asUtc = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second"));
+  return Math.round((asUtc - Math.floor(now.getTime() / 1000) * 1000) / 60000);
+}
+
 export function kyivToday(): string {
   const now = new Date();
   const kyivMs =
-    now.getTime() + (3 * 60 - now.getTimezoneOffset()) * 60000;
+    now.getTime() + (kyivOffsetMinutes(now) - now.getTimezoneOffset()) * 60000;
   return new Date(kyivMs).toISOString().slice(0, 10);
 }

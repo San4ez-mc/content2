@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { kyivOffsetMinutes } from "@/lib/utils";
 
 const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
 const TG_FLOWS_URL = "https://flows.fineko.space/webhook/bot/content-scheduler";
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   // Get Kyiv time
   const now = new Date();
-  const kyivMs = now.getTime() + (3 * 60 - now.getTimezoneOffset()) * 60000;
+  const kyivMs = now.getTime() + (kyivOffsetMinutes(now) - now.getTimezoneOffset()) * 60000;
   const kyivNow = new Date(kyivMs);
   const todayStr = kyivNow.toISOString().slice(0, 10);
   const currentTime = `${String(kyivNow.getHours()).padStart(2, "0")}:${String(kyivNow.getMinutes()).padStart(2, "0")}`;

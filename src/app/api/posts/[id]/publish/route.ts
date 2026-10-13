@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { kyivOffsetMinutes } from "@/lib/utils";
 import { guardRecordProject } from "@/lib/tenant";
 import { broadcastToProject } from "@/lib/sse";
 
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const schedule = await prisma.scheduleSettings.findFirst({ where: { projectId: group.projectId }, select: { telegramChatId: true } });
   const now = new Date();
-  const todayStr = new Date(now.getTime() + (3 * 60 - now.getTimezoneOffset()) * 60000).toISOString().slice(0, 10);
+  const todayStr = new Date(now.getTime() + (kyivOffsetMinutes(now) - now.getTimezoneOffset()) * 60000).toISOString().slice(0, 10);
 
   try {
     const res = await fetch(TG_FLOWS_URL, {

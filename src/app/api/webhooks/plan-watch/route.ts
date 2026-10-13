@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { kyivOffsetMinutes } from "@/lib/utils";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const HORIZON_DAYS = 3; // скільки найближчих днів мають бути закриті постами
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("token") !== WEBHOOK_SECRET) return NextResponse.json({ ok: false }, { status: 401 });
 
   const now = new Date();
-  const kyiv = new Date(now.getTime() + (3 * 60 - now.getTimezoneOffset()) * 60000);
+  const kyiv = new Date(now.getTime() + (kyivOffsetMinutes(now) - now.getTimezoneOffset()) * 60000);
   const todayUtc = Date.UTC(kyiv.getUTCFullYear(), kyiv.getUTCMonth(), kyiv.getUTCDate());
 
   const networks = await prisma.socialNetwork.findMany({
