@@ -11,7 +11,7 @@ export default async function UserDataPage({ searchParams }: { searchParams: { p
   if (!activeProject) redirect("/");
   const projectId = activeProject.id;
 
-  const [project, brand, personas, products, cases, strategy, topicsCount] = await Promise.all([
+  const [project, brand, personas, products, cases, strategy, topicsCount, founder] = await Promise.all([
     prisma.project.findUnique({ where: { id: projectId } }),
     prisma.knowledgeEntry.findMany({ where: { projectId, isActive: true }, orderBy: { updatedAt: "desc" } }),
     prisma.persona.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } }),
@@ -19,7 +19,12 @@ export default async function UserDataPage({ searchParams }: { searchParams: { p
     prisma.case.findMany({ where: { projectId }, orderBy: { createdAt: "asc" } }),
     prisma.smmStrategy.findFirst({ where: { projectId }, orderBy: { version: "desc" } }),
     prisma.contentTopic.count({ where: { projectId } }),
+    prisma.founderProfile.findUnique({ where: { projectId } }),
   ]);
+
+  // Json-поля профілю засновника: агент може слати і рядки, і {length,text}.
+  const strList = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((x: any) => (typeof x === "string" ? x : x?.text ? String(x.text) : "")).filter(Boolean) : [];
 
   // Сирі завантажені документи (джерело) відділяємо від канонічного бренд-гайду:
   // вони вже розібрані в структуру (продукти/персони/кейси) і НЕ є базою генерації.
@@ -38,6 +43,15 @@ export default async function UserDataPage({ searchParams }: { searchParams: { p
       ? { version: strategy.version, contentPillars: strategy.contentPillars as any, intentDistribution: strategy.intentDistribution as any }
       : null,
     topicsCount,
+    founder: founder
+      ? {
+          core: founder.core,
+          strengths: strList(founder.strengths),
+          interactionStyle: founder.interactionStyle,
+          differentiators: strList(founder.differentiators),
+          selfPresentation: strList(founder.selfPresentation),
+        }
+      : null,
   };
 
   return <UserDataView data={data} />;

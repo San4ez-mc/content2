@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   const summary = [
     `Профіль заповнено на ${progress}%.`,
     `Компанія: ${project.name}.`,
-    `Засновник: ${founder?.core ? "профіль є" : "ще нема"}${founder?.archetypePrimary ? `, архетип: ${founder.archetypePrimary}` : ""}.`,
+    `Засновник: ${founder?.core ? "профіль є" : "ще нема"}.`,
     products.length ? `Продукти: ${products.map((p) => p.name).join(", ")}.` : "Продуктів ще нема.",
     personas.length ? `Персони: ${personas.map((p) => p.name).join(", ")}.` : "Персон ще нема.",
     `Кейсів: ${cases}. Лід-магнітів: ${leadMagnets}. Тем: ${topicsCount}.`,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   const BASE = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
   const links = {
     all: `${BASE}/user-data`,        // усе разом: продукти, персони, кейси, стратегія
-    founder: `${BASE}/founder`,
+    founder: `${BASE}/user-data#founder`,
     products: `${BASE}/products`,
     topics: `${BASE}/topics`,
     leadMagnets: `${BASE}/lead-magnets`,

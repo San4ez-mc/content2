@@ -12,6 +12,7 @@ interface Data {
   cases: { id: string; title: string; niche: string | null; problem: string | null; solution: string | null; metrics: Record<string, any> | null; allowedClaims: string | null }[];
   strategy: { version: number; contentPillars: any; intentDistribution: any } | null;
   topicsCount: number;
+  founder: { core: string | null; strengths: string[]; interactionStyle: string | null; differentiators: string[]; selfPresentation: string[] } | null;
 }
 
 function Row({ label, value }: { label: string; value?: string | null }) {
@@ -123,6 +124,21 @@ export function UserDataView({ data }: { data: Data }) {
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
+        {/* Профіль засновника (посилання з онбордингу веде на #founder) */}
+        <div id="founder">
+          <Section title="Профіль засновника" count={data.founder ? 1 : 0} section="founder" projectId={projectId} noDownload empty="Ще немає профілю засновника. Заповнюється онбордингом.">
+            {data.founder && (
+              <Card title="Хто говорить" subtitle="ядро, сильні сторони, відмінності">
+                <Row label="Ядро" value={data.founder.core} />
+                <Row label="Стиль роботи" value={data.founder.interactionStyle} />
+                {data.founder.strengths.length > 0 && <Row label="Сильні сторони" value={data.founder.strengths.join("; ")} />}
+                {data.founder.differentiators.length > 0 && <Row label="Чим відрізняюсь" value={data.founder.differentiators.join("; ")} />}
+                {data.founder.selfPresentation.map((t, i) => <Row key={i} label={`Самопрезентація ${i + 1}`} value={t} />)}
+              </Card>
+            )}
+          </Section>
+        </div>
+
         {/* Бренд і Tone of Voice */}
         <Section title="Бренд і Tone of Voice" count={data.brand.length} section="brand" projectId={projectId} empty="Ще немає бренд-гайду. Заповнюється онбордингом або вручну.">
           {data.brand.map((b) => (

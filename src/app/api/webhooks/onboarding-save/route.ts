@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
     product: `${BASE}/products`, products: `${BASE}/products`, leadmagnet: `${BASE}/lead-magnets`,
     topics: `${BASE}/topics`, persona: `${BASE}/user-data`, case: `${BASE}/user-data`,
     strategy: `${BASE}/user-data`, brand: `${BASE}/user-data`, doc: `${BASE}/storage`,
-    founder: `${BASE}/founder`,
+    founder: `${BASE}/user-data#founder`,
   };
   const viewUrl = viewUrlByKind[kind] || `${BASE}/user-data`;
 
