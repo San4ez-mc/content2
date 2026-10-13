@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
   if (!kind || !data) {
     return NextResponse.json({ error: "kind, data required" }, { status: 400 });
   }
+  // Один обʼєкт замість списку (kind products/topics) — загортаємо, а не губимо.
+  if (kind === "products" && data && !Array.isArray(data) && !Array.isArray(data.products) && data.name) data = { products: [data] };
+  if (kind === "topics" && data && !Array.isArray(data) && !Array.isArray(data.topics) && data.title) data = { topics: [data] };
   // Порожній список тем/продуктів — це помилка, а не «ок»: агент має це побачити й повторити.
   if (kind === "topics" || kind === "products") {
     const list = kind === "topics" ? (Array.isArray(data?.topics) ? data.topics : Array.isArray(data) ? data : []) : (Array.isArray(data?.products) ? data.products : Array.isArray(data) ? data : []);
