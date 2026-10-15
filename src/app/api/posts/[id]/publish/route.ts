@@ -43,6 +43,37 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (first.generationStatus && first.generationStatus !== "done") return NextResponse.json({ ok: false, error: "Відео ще генерується" }, { status: 400 });
   }
 
+  // TikTok: публікація лише з явними вибором користувача з вікна публікації (вимога TikTok до Direct Post:
+  // приватність без значення за замовчуванням, коментарі/дует/стіч вимкнені доти, доки користувач не ввімкне,
+  // розкриття комерційного змісту, згода перед публікацією).
+  let tiktok: Record<string, unknown> | null = null;
+  if (platformKey === "tiktok") {
+    const t = body?.tiktok || null;
+    const PRIVACY = ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"];
+    if (!t || !PRIVACY.includes(t.privacy_level)) {
+      return NextResponse.json({ ok: false, error: "Оберіть, хто бачить відео (Privacy), у вікні публікації TikTok" }, { status: 400 });
+    }
+    if (t.consent !== true) return NextResponse.json({ ok: false, error: "Потрібна згода користувача на публікацію" }, { status: 400 });
+    const brandContent = t.brand_content === true;
+    const brandOrganic = t.brand_organic === true;
+    if (t.disclose === true && !brandContent && !brandOrganic) {
+      return NextResponse.json({ ok: false, error: "Вкажіть, чи відео рекламує ваш бренд, третю сторону чи обидва" }, { status: 400 });
+    }
+    if (brandContent && t.privacy_level === "SELF_ONLY") {
+      return NextResponse.json({ ok: false, error: "Branded content visibility cannot be set to private." }, { status: 400 });
+    }
+    tiktok = {
+      privacy_level: t.privacy_level,
+      title: String(t.title ?? "").slice(0, 2200),
+      allow_comment: t.allow_comment === true,
+      allow_duet: t.allow_duet === true,
+      allow_stitch: t.allow_stitch === true,
+      brand_content: brandContent,
+      brand_organic: brandOrganic,
+      is_aigc: t.is_aigc === true,
+    };
+  }
+
   // «Замок»: один запис publication_queue на пост, щоб подвійний клік/cron не опублікували двічі.
   const existing = await prisma.publicationQueue.findUnique({ where: { postGroupId: group.id } });
   if (existing && !force) {
@@ -78,6 +109,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           postDirectly: true,
           autopostSlug: slug,
           hook: group.hookA || null,
+          tiktok,
           formatKey: group.formatKey || null,
           items: group.items.map((i) => ({
             content: i.content,

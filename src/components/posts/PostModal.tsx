@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn, STATUS_META } from "@/lib/utils";
 import { PostConstructor } from "./PostConstructor";
+import { TikTokPublishDialog } from "./TikTokPublishDialog";
 
 // #244 Теми (наміри) контенту — Ф3.6
 const INTENT_LABELS: Record<string, string> = {
@@ -100,6 +101,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState("");
+  const [tiktokOpen, setTiktokOpen] = useState(false);
 
   async function saveReactions() {
     await fetch(`/api/posts/${group.id}/score`, {
@@ -197,6 +199,12 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
     } finally {
       setPublishing(false);
     }
+  }
+
+  // TikTok: окреме вікно публікації (вимоги TikTok до Direct Post) замість простого confirm.
+  async function openTiktokDialog() {
+    await save(true); // публікуємо актуальну версію з модалки
+    setTiktokOpen(true);
   }
 
   async function deleteGroup() {
@@ -798,7 +806,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
             {publishMsg && <span className="text-[11px] text-fg-muted max-w-[220px] truncate" title={publishMsg}>{publishMsg}</span>}
             {canPublish && (
               <button
-                onClick={() => publishNow(false)}
+                onClick={() => (group.socialNetwork.platformKey === "tiktok" ? openTiktokDialog() : publishNow(false))}
                 disabled={publishing || saving}
                 className="btn-ghost text-xs px-3 py-1.5 border border-border"
                 title={`Опублікувати зараз у ${group.socialNetwork.name}`}
@@ -817,6 +825,15 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
           </div>
         </div>
       </div>
+      {tiktokOpen && (
+        <TikTokPublishDialog
+          postId={group.id}
+          videoUrl={items[0]?.imagePath || ""}
+          initialTitle={items[0]?.content || ""}
+          onClose={() => setTiktokOpen(false)}
+          onPublished={onUpdate}
+        />
+      )}
     </div>
   );
 }
