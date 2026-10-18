@@ -11,7 +11,7 @@ export default function TermsPage() {
 
         <section className="space-y-2">
           <h2 className="font-semibold">1. The service</h2>
-          <p>FINEKO Content Platform helps you plan, generate and publish content to social network accounts that you own or are authorised to manage. By using it you agree to these terms.</p>
+          <p>FINEKO Content Platform helps you plan, generate and publish content to social network accounts that you own or are authorised to manage. By using it you agree to these terms. The platform is operated by FINEKO (Oleksandr Matsuk) and is used, among other accounts, to publish short videos for the KIRO project (the “Kiro” TikTok app and the KIRO TikTok account).</p>
         </section>
 
         <section className="space-y-2">
@@ -46,7 +46,7 @@ export default function TermsPage() {
         <hr className="border-border" />
 
         <h2 className="text-lg font-semibold">Умови користування (українською)</h2>
-        <p>FINEKO Content Platform допомагає планувати, генерувати й публікувати контент в акаунти соцмереж, якими ви володієте або керуєте за дорученням. Ви відповідаєте за контент, дотримуєтесь правил кожної соцмережі (для TikTok — Terms of Service, Community Guidelines, Music Usage Confirmation, а для реклами — Branded Content Policy) і не використовуєте сервіс для незаконного, оманливого чи спам-контенту.</p>
+        <p>FINEKO Content Platform допомагає планувати, генерувати й публікувати контент в акаунти соцмереж, якими ви володієте або керуєте за дорученням. Платформу веде FINEKO (Олександр Мацук); вона використовується, зокрема, для публікації коротких відео проєкту KIRO (застосунок «Kiro» у TikTok і акаунт KIRO). Ви відповідаєте за контент, дотримуєтесь правил кожної соцмережі (для TikTok — Terms of Service, Community Guidelines, Music Usage Confirmation, а для реклами — Branded Content Policy) і не використовуєте сервіс для незаконного, оманливого чи спам-контенту.</p>
         <p>Відео публікуються в TikTok лише після того, як ви обрали налаштування у вікні публікації й підтвердили. Сервіс надається «як є», без гарантій безперебійної роботи. Ви можете припинити користування й попросити видалити дані будь-коли (див. <a className="underline" href="/privacy">Політику конфіденційності</a>). Зв’язок: <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
       </div>
     </main>

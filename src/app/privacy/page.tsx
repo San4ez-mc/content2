@@ -11,7 +11,7 @@ export default function PrivacyPage() {
 
         <section className="space-y-2">
           <h2 className="font-semibold">Who we are</h2>
-          <p>FINEKO Content Platform is a tool for planning, generating and publishing content to social network accounts that belong to the person using it. It is operated by FINEKO (Oleksandr Matsuk). Contact: <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+          <p>FINEKO Content Platform is a tool for planning, generating and publishing content to social network accounts that belong to the person using it. It is operated by FINEKO (Oleksandr Matsuk) and is used, among other accounts, to publish short videos for the KIRO project — the “Kiro” TikTok app and the KIRO TikTok account. Contact: <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
         </section>
 
         <section className="space-y-2">
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
         <hr className="border-border" />
 
         <h2 className="text-lg font-semibold">Політика конфіденційності (українською)</h2>
-        <p>FINEKO Content Platform — інструмент для планування, генерації й публікації контенту в акаунти соцмереж, що належать користувачеві. Оператор — FINEKO (Олександр Мацук), зв’язок: <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+        <p>FINEKO Content Platform — інструмент для планування, генерації й публікації контенту в акаунти соцмереж, що належать користувачеві. Оператор — FINEKO (Олександр Мацук); платформа використовується, зокрема, для публікації коротких відео проєкту KIRO (застосунок «Kiro» у TikTok і акаунт KIRO). Зв’язок: <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
         <p>Ми обробляємо дані облікового запису (імʼя, email, створений контент), а при підключенні TikTok — open ID, імʼя й аватар акаунта та токени доступу, щоб публікувати лише ті відео, які ви самі обрали й підтвердили у вікні публікації. Ми нічого не публікуємо без вашого підтвердження, не продаємо й не передаємо дані третім особам, не використовуємо їх для реклами.</p>
         <p>Дані зберігаються у базі з обмеженим доступом, поки підключення активне. Ви можете відкликати доступ у налаштуваннях TikTok (Settings → Security &amp; permissions → Apps and services) і попросити видалити дані листом — ми видаляємо їх протягом 30 днів.</p>
       </div>
