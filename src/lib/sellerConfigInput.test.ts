@@ -40,3 +40,22 @@ describe("sanitizeConfigInput", () => {
     expect(err({ paymentConnectorId: "a b; drop" })).toMatch(/конектора/);
   });
 });
+
+import { prefillPatch } from "./sellerConfigInput";
+describe("prefillPatch", () => {
+  it("заповнює порожні поля", () => {
+    expect(prefillPatch(null, { sellerName: "Ден", sellerTitle: "ШІ-продавець Олександра", handoffTelegramId: "345126254" }))
+      .toEqual({ sellerName: "Ден", sellerTitle: "ШІ-продавець Олександра", handoffTelegramId: "345126254" });
+  });
+  it("не перезаписує те, що вже заповнено", () => {
+    expect(prefillPatch({ sellerName: "Софія", bookingNote: "" }, { sellerName: "Ден", bookingNote: "пишіть у Telegram" })).toEqual({ bookingNote: "пишіть у Telegram" });
+  });
+  it("пропускає невалідне, решту приймає", () => {
+    const p = prefillPatch({}, { handoffTelegramId: "@olexandr", bookingUrl: "javascript:alert(1)", allowedContacts: "t.me/olexandrmatsuk" });
+    expect(p).toEqual({ allowedContacts: "t.me/olexandrmatsuk" });
+  });
+  it("статус, режим, оплату й тестерів не чіпає", () => {
+    expect(prefillPatch({}, { status: "live", mode: "paid_consult", priceAmount: 100, paymentConnectorId: "abcdefgh12", testAllowlist: ["12345"], sellerName: "Ден" })).toEqual({ sellerName: "Ден" });
+  });
+  it("порожні значення ігнорує", () => expect(prefillPatch({}, { sellerName: "  ", bookingNote: null })).toEqual({}));
+});

@@ -76,3 +76,20 @@ export function sanitizeConfigInput(body: Record<string, unknown>): Result {
   }
   return { ok: true, data: d };
 }
+
+// Підказки від онбордингу заповнюють ЛИШЕ порожні поля й лише ці. Статус, режим, оплату, тестерів, тексти не чіпають:
+// ними керує власник у адмінці. Невалідне поле пропускається, не блокуючи решту.
+export const PREFILL_KEYS = ["sellerName", "sellerTitle", "bookingUrl", "bookingNote", "allowedContacts", "handoffTelegramId"] as const;
+
+export function prefillPatch(existing: Record<string, unknown> | null | undefined, incoming: Record<string, unknown>): ConfigPatch {
+  const out: ConfigPatch = {};
+  for (const k of PREFILL_KEYS) {
+    const cur = existing ? existing[k] : "";
+    if (cur != null && String(cur).trim() !== "") continue; // вже заповнено людиною
+    const v = incoming ? incoming[k] : "";
+    if (v == null || String(v).trim() === "") continue;
+    const one = sanitizeConfigInput({ [k]: v });
+    if (one.ok) Object.assign(out, one.data);
+  }
+  return out;
+}
