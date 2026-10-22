@@ -15,6 +15,7 @@ const NAV = [
   { href: "/lead-magnets", label: "Лід-магніти" },
   { href: "/topics", label: "Теми" },
   { href: "/facts", label: "Актуальне" },
+  { href: "/seller", label: "Продавець" },
   { href: "/storage", label: "Сховище" },
   { href: "/structures", label: "Структури" },
   { href: "/tools", label: "Воронки" },

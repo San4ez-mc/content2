@@ -56,6 +56,7 @@ model Project {
   contentTopics    ContentTopic[]
   products         Product[]
   leadMagnets      LeadMagnet[]
+  sellerConfig     SellerConfig?
 
   @@map("projects")
 }
@@ -637,4 +638,36 @@ model ContentTool {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("content_tools")
+}
+
+// ─── ШІ-продавець експерта ─────────────────────────────────────
+// Правила продажу (НЕ контент): режим, запис, оплата, ліміти, статус запуску. 1:1 з Project.
+// Контент для продавця (послуга, кейси, клієнти, профіль експерта, факти) береться з Product/Case/Persona/FounderProfile/KnowledgeEntry;
+// воронка Flows бере скомпільований бриф (src/lib/sellerBrief.ts) і сама нічого про експерта не зберігає.
+model SellerConfig {
+  id                 String    @id @default(cuid())
+  projectId          String    @unique @map("project_id")
+  status             String    @default("draft") // draft | testing | live | paused
+  mode               String    @default("book_consult") // book_consult | paid_consult
+  sellerName         String    @default("") @map("seller_name") // як звати продавця («Ден»)
+  sellerTitle        String    @default("") @map("seller_title") // «ШІ-продавець Олександра Мацука»
+  primaryProductId   String?   @map("primary_product_id")
+  bookingUrl         String?   @map("booking_url")
+  bookingNote        String?   @map("booking_note") @db.Text // як записуються без посилання, години, пояс
+  handoffTelegramId  String?   @map("handoff_telegram_id") // куди слати гарячих лідів і виклик людини
+  allowedContacts    String?   @map("allowed_contacts") @db.Text // єдині контакти, які бот може називати
+  priceAmount        Int?      @map("price_amount") // для paid_consult
+  currency           String    @default("UAH")
+  paymentConnectorId String?   @map("payment_connector_id") // посилання на збережений конектор Flows, не ключ
+  monthlyDialogLimit Int?      @map("monthly_dialog_limit")
+  testAllowlist      Json      @default("[]") @map("test_allowlist") // Telegram ID, яким можна говорити з продавцем у статусі testing
+  texts              Json      @default("{}") // перевизначення текстів воронки (greeting, offer, softExit, nudge…)
+  funnelBotId        String?   @map("funnel_bot_id")
+  templateVersion    String?   @map("template_version")
+  goLiveAt           DateTime? @map("go_live_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("seller_configs")
 }
