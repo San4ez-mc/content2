@@ -74,6 +74,11 @@ export function parseDoc(text: string | null | undefined): ParsedDoc {
   return { value: values.join("\n"), confirmed, hasUnconfirmed };
 }
 
+/** Прибирає з початку тексту власну мітку експерта («Бот не обіцяє: …», «Передати розмову Олександру, якщо: …»), щоб у промпті вона не дублювалась. */
+export function stripLabel(s: string): string {
+  return String(s || "").trim().replace(/^(?:що\s+)?(?:бот\s+не\s+обіцяє|не\s+обіцяти|передати\s+розмову[^:\n]{0,60}|коли\s+(?:кликати|звати|передавати)[^:\n]{0,60}|заборонено[^:\n]{0,40})\s*:\s*/i, "").trim();
+}
+
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x == null ? "" : x).trim()).filter(Boolean) : []);
 const clip = (s: string | null | undefined, n: number) => { const t = String(s || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 
@@ -185,8 +190,8 @@ export function compileBrief(i: BriefInput, telegramId?: string | null, opts: { 
   for (const [k, v] of Object.entries(overrides)) if (typeof v === "string" && v.trim()) texts[k] = v.trim();
 
   // ── блоки для промпту ──
-  const never = docs[DOC.never]?.value || "";
-  const handoff = docs[DOC.handoff]?.value || "";
+  const never = stripLabel(docs[DOC.never]?.value || "");
+  const handoff = stripLabel(docs[DOC.handoff]?.value || "");
   const contacts = (c?.allowedContacts || "").trim();
   const sensitive = docs[DOC.sensitive]?.value || "";
 
@@ -222,7 +227,9 @@ export function compileBrief(i: BriefInput, telegramId?: string | null, opts: { 
     "• Розрахунки: спершу переведи валюту, перевір множення; не впевнений, називай «приблизно» і діапазон.",
   ].filter(Boolean).join("\n");
 
-  const founderBits = [i.founder?.core ? `Хто експерт: ${clip(i.founder.core, 500)}` : "", i.founder?.interactionStyle ? `Як працює з клієнтом: ${clip(i.founder.interactionStyle, 300)}` : ""].filter(Boolean);
+  const styleText = docs[DOC.style]?.value || "";
+  const sameAsStyle = !!i.founder?.interactionStyle && clip(i.founder.interactionStyle, 300) === clip(styleText, 300);
+  const founderBits = [i.founder?.core ? `Хто експерт: ${clip(i.founder.core, 500)}` : "", i.founder?.interactionStyle && !sameAsStyle ? `Як працює з клієнтом: ${clip(i.founder.interactionStyle, 300)}` : ""].filter(Boolean);
   const persona = i.personas[0];
   const tone = [
     "━━━ ГОЛОС І СТИЛЬ ━━━",

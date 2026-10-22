@@ -194,4 +194,21 @@ describe("тексти й імʼя", () => {
     expect(compileBrief(i).texts.direct).not.toMatch(/Якщо зручніше самому/);
   });
   it("текст після оплати є за замовчуванням", () => expect(compileBrief(full()).texts.paid).toMatch(/Оплату отримано/));
+
+  it("мітки експерта не дублюються в правилах", () => {
+    const i = full();
+    i.docs[0] = doc(DOC.never, "Що бот не обіцяє: гарантії результату, знижки " + "[підтверджено експертом]");
+    i.docs[1] = doc(DOC.handoff, "Передати розмову Олександру, якщо: скарга, питання про договір [підтверджено експертом]");
+    const r = compileBrief(i).blocks.rules;
+    expect(r).toContain("ЗАБОРОНЕНО обіцяти/стверджувати: гарантії результату");
+    expect(r).toContain("Негайно передай розмову експерту (скажи, що він напише сам), якщо: скарга");
+    expect(r).not.toMatch(/Передати розмову Олександру, якщо/);
+  });
+  it("стиль не повторюється двічі, якщо профіль експерта дослівно його дублює", () => {
+    const i = full();
+    i.docs.push(doc(DOC.style, "Стиль: на «ти», жваво [підтверджено експертом]"));
+    i.founder = { core: "AI-автоматизатор", interactionStyle: "на «ти», жваво" };
+    const tone = compileBrief(i).blocks.tone;
+    expect(tone.split("на «ти», жваво").length - 1).toBe(1);
+  });
 });
