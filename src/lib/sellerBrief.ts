@@ -76,7 +76,7 @@ export function parseDoc(text: string | null | undefined): ParsedDoc {
 
 /** Прибирає з початку тексту власну мітку експерта («Бот не обіцяє: …», «Передати розмову Олександру, якщо: …»), щоб у промпті вона не дублювалась. */
 export function stripLabel(s: string): string {
-  return String(s || "").trim().replace(/^(?:що\s+)?(?:бот\s+не\s+обіцяє|не\s+обіцяти|передати\s+розмову[^:\n]{0,60}|коли\s+(?:кликати|звати|передавати)[^:\n]{0,60}|заборонено[^:\n]{0,40})\s*:\s*/i, "").trim();
+  return String(s || "").trim().replace(/^(?:що\s+)?(?:бот\s+не\s+обіцяє|не\s+обіцяти|переда(?:ти|вати)\s+розмову[^:\n]{0,60}|коли\s+(?:кликати|звати|передавати)[^:\n]{0,60}|заборонено[^:\n]{0,40})\s*:\s*/i, "").trim();
 }
 
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x == null ? "" : x).trim()).filter(Boolean) : []);
