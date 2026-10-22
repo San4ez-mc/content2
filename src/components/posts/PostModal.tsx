@@ -169,7 +169,7 @@ export function PostModal({ group, projectId, onClose, onUpdate }: Props) {
     }
   }
 
-  const canPublish = ["tiktok", "youtube", "threads"].includes(group.socialNetwork.platformKey);
+  const canPublish = ["tiktok", "youtube", "threads", "instagram"].includes(group.socialNetwork.platformKey);
   async function publishNow(force = false) {
     const net = group.socialNetwork.name;
     const tiktokNote = group.socialNetwork.platformKey === "tiktok"

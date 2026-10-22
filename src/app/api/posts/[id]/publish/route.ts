@@ -14,6 +14,7 @@ const DEFAULT_PUBLISHER: Record<string, string> = {
   tiktok: "publish-tiktok",
   youtube: "publish-youtube-shorts",
   threads: "publish-threads",
+  instagram: "publish-instagram",
 };
 const VIDEO_PLATFORMS = new Set(["tiktok", "youtube"]);
 const isVideoPath = (p?: string | null) => !!p && /\.(mp4|mov|webm|m4v)(\?|$)/i.test(p);
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const first = group.items[0];
   if (!first || (!first.content && !first.imagePath)) return NextResponse.json({ ok: false, error: "У пості немає контенту" }, { status: 400 });
+  if (platformKey === "instagram" && !first.imagePath) {
+    return NextResponse.json({ ok: false, error: "Instagram не публікує текст без медіа: додай фото або відео" }, { status: 400 });
+  }
   if (VIDEO_PLATFORMS.has(platformKey)) {
     if (!isVideoPath(first.imagePath)) return NextResponse.json({ ok: false, error: "Відео ще не згенероване — дочекайся завершення рендера" }, { status: 400 });
     if (first.generationStatus && first.generationStatus !== "done") return NextResponse.json({ ok: false, error: "Відео ще генерується" }, { status: 400 });
