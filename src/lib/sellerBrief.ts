@@ -159,6 +159,19 @@ export function defaultTexts(name: string, title: string, serviceName: string, c
   };
 }
 
+/** Напрями (не готові тексти): у якій ситуації що і в якому дусі сказати. Продавець формулює відповідь сам, за контекстом розмови й тоном експерта. */
+export function defaultDirections(): Record<string, string> {
+  return {
+    greeting: "Привітайся природно, без шаблонних фраз: назви себе (імʼя і титул), чесно скажи, що ти ШІ, одним реченням скажи, чим допомагаєш (послуга експерта), і спитай ОДНЕ відкрите питання про ситуацію людини. Максимум 2-3 речення.",
+    notRelevant: "Подякуй і ввічливо відпусти: послуга експерта їй не підходить. Поясни це лише загальними словами, без критики людини. Не продавай далі. Залиш двері відчиненими. Одне-два речення, мовою людини.",
+    softExit: "Людина не готова вирішувати. Прийми це без тиску, коротко поверни одну корисну думку з розмови і скажи, що можна повернутись будь-коли. Без наполягань, найбільше одне легке питання або жодного.",
+    nudge: "Мʼяко нагадай про себе після паузи: повʼяжи з тим, що людина розповідала про свою ситуацію, і спитай одне конкретне питання, що лишилось незрозумілим. Без тиску, без докорів, без «ви не відповіли».",
+    direct: "Скажи, що її запит краще обговорити напряму з експертом і що ти передав заявку. Якщо в правилах є дозволений контакт, запропонуй його як запасний шлях. Не обіцяй, коли саме експерт відповість.",
+    paid: "Подякуй за оплату і скажи, що експерт напише найближчим часом, щоб домовитись про час. Тепло, коротко.",
+    afterEnd: "Коротко підтвердь, що все гаразд, і скажи, що можна писати, коли знадобиться. Одне речення.",
+  };
+}
+
 export interface Brief {
   ok: true;
   projectId: string; projectName: string;
@@ -169,6 +182,7 @@ export interface Brief {
   booking: { url: string; note: string };
   payment: { connectorId: string };
   texts: Record<string, string>;
+  directions: Record<string, string>;
   blocks: { offer: string; proof: string; rules: string; tone: string; facts: string; faq: string; qualify: string; booking: string; all: string };
   funnel: { botId: string; templateVersion: string };
 }
@@ -188,6 +202,9 @@ export function compileBrief(i: BriefInput, telegramId?: string | null, opts: { 
   const overrides = (c?.texts && typeof c.texts === "object" ? (c.texts as Record<string, unknown>) : {});
   const texts: Record<string, string> = { ...dt };
   for (const [k, v] of Object.entries(overrides)) if (typeof v === "string" && v.trim()) texts[k] = v.trim();
+  // напрями: ті самі ключі в налаштуваннях тепер читаються як НАПРЯМ (що і в якому дусі сказати), а не готовий текст
+  const directions: Record<string, string> = defaultDirections();
+  for (const [k, v] of Object.entries(overrides)) if (k in directions && typeof v === "string" && v.trim()) directions[k] = v.trim();
 
   // ── блоки для промпту ──
   const never = stripLabel(docs[DOC.never]?.value || "");
@@ -241,7 +258,7 @@ export function compileBrief(i: BriefInput, telegramId?: string | null, opts: { 
   ].filter(Boolean).join("\n");
 
   const factsBlock = factsPromptBlock(i.facts);
-  const faq = docs[DOC.faq]?.value ? "━━━ ЧАСТІ ЗАПИТАННЯ ТА ВІДПОВІДІ ЕКСПЕРТА ━━━\n" + clip(docs[DOC.faq].value, 1800) : "";
+  const faq = docs[DOC.faq]?.value ? "━━━ ЧАСТІ ЗАПИТАННЯ ТА НАПРЯМ ВІДПОВІДЕЙ ЕКСПЕРТА (це суть, а не готовий текст: відповідай своїми словами за ситуацією людини) ━━━\n" + clip(docs[DOC.faq].value, 1800) : "";
   const qualify = docs[DOC.qualify]?.value ? "━━━ ЩО З’ЯСОВУВАТИ ПРО ЛЮДИНУ (до пропозиції запису) ━━━\n" + clip(docs[DOC.qualify].value, 800) : "";
   const bookingText = [c?.bookingUrl ? `Посилання на запис: ${c.bookingUrl}` : "", (c?.bookingNote || docs[DOC.booking]?.value || "") && `Запис: ${clip(c?.bookingNote || docs[DOC.booking]?.value, 500)}`].filter(Boolean).join("\n");
   const booking = bookingText ? "━━━ ЯК ЗАПИСАТИСЬ ━━━\n" + bookingText : "";
@@ -258,6 +275,7 @@ export function compileBrief(i: BriefInput, telegramId?: string | null, opts: { 
     booking: { url: (c?.bookingUrl || "").trim(), note: (c?.bookingNote || docs[DOC.booking]?.value || "").trim() },
     payment: { connectorId: (c?.paymentConnectorId || "").trim() },
     texts,
+    directions,
     blocks: { offer, proof, rules, tone, facts: factsBlock, faq, qualify, booking, all },
     funnel: { botId: c?.funnelBotId || "", templateVersion: c?.templateVersion || "" },
   };

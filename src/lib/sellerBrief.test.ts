@@ -183,6 +183,22 @@ describe("тексти й імʼя", () => {
     expect(compileBrief(i).expert.sellerName).toBe("Софія");
   });
   it("розкриття ШІ завжди чесне", () => expect(compileBrief(full()).expert.disclosure).toBe("honest_ai"));
+  it("замість готових відповідей бриф дає напрями", () => {
+    const d = compileBrief(full()).directions;
+    expect(Object.keys(d)).toEqual(expect.arrayContaining(["greeting", "notRelevant", "softExit", "nudge", "direct", "paid", "afterEnd"]));
+    expect(d.greeting).toMatch(/^Привітайся/);
+    expect(d.greeting).not.toMatch(/^Привіт!/);
+  });
+  it("напрям з налаштувань замінює типовий, чужі ключі ігноруються", () => {
+    const i = full(); i.config!.texts = { greeting: "Привітайся жартома", bogus: "x" };
+    const d = compileBrief(i).directions;
+    expect(d.greeting).toBe("Привітайся жартома");
+    expect(d).not.toHaveProperty("bogus");
+  });
+  it("часті запитання подаються як напрям, а не готовий текст", () => {
+    const i = full(); i.docs.push(doc(DOC.faq, "Питання: дорого? Суть відповіді: порахувати втрати від повільних відповідей [підтверджено експертом]"));
+    expect(compileBrief(i).blocks.faq).toMatch(/НАПРЯМ ВІДПОВІДЕЙ/);
+  });
 
   it("контакти експерта є в брифі та в тексті передачі напряму", () => {
     const b = compileBrief(full());

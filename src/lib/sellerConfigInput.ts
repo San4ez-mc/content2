@@ -2,7 +2,7 @@
 export const STATUSES = ["draft", "testing", "live", "paused"] as const;
 export const MODES = ["book_consult", "paid_consult"] as const;
 export const CURRENCIES = ["UAH", "USD", "EUR"] as const;
-export const TEXT_KEYS = ["greeting", "notRelevant", "softExit", "nudge", "unavailable", "direct", "paid"] as const;
+export const TEXT_KEYS = ["greeting", "notRelevant", "softExit", "nudge", "unavailable", "direct", "paid", "afterEnd"] as const;
 
 export type ConfigPatch = Partial<{
   status: string; mode: string; sellerName: string; sellerTitle: string; primaryProductId: string | null;
