@@ -71,7 +71,7 @@ export async function projectKnowledgeView(projectId: string) {
     sections,
     dossier: dossierSummary(dossier ? dossier.state : null),
     seller: seller
-      ? { path: "/seller", exists: seller.exists, status: seller.config.status, mode: seller.config.mode, sellerName: seller.config.sellerName,
+      ? { exists: seller.exists, status: seller.config.status, mode: seller.config.mode, sellerName: seller.config.sellerName,
           ready: seller.readiness.ready, missing: seller.readiness.missing, warnings: seller.readiness.warnings }
       : null,
   };
