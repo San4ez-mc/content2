@@ -6,8 +6,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { authOptions } from "./auth";
 import { prisma } from "./prisma";
+import { ssoAccessOf } from "./ssoAccess";
 
-export type SessionUser = { id: string; role: string; email?: string };
+export type SessionUser = { id: string; role: string; email?: string; ssoUserId?: string };
 export type ProjectLite = { id: string; name: string };
 
 // superadmin/admin бачать усі проєкти; client — лише свої (ProjectUser).
@@ -19,9 +20,29 @@ export const ACTIVE_PROJECT_COOKIE = "active_project_id";
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
-  const u = session?.user as { id?: string; role?: string; email?: string } | undefined;
+  const u = session?.user as { id?: string; role?: string; email?: string; ssoUserId?: string } | undefined;
   if (!u?.id) return null;
-  return { id: u.id, role: u.role || "client", email: u.email };
+  return { id: u.id, role: u.role || "client", email: u.email, ssoUserId: u.ssoUserId };
+}
+
+/** Доступи людини: для SSO-входу їх дає SSO (єдине джерело правди), для старого входу за паролем лишається локальна роль + членство. */
+async function accessOf(user: SessionUser): Promise<{ global: boolean; projects: ProjectLite[] | null }> {
+  if (user.ssoUserId) {
+    const a = await ssoAccessOf(user.ssoUserId, user.email);
+    if (a.global) return { global: true, projects: null };
+    if (!a.projectIds.length) return { global: false, projects: [] };
+    const list = await prisma.project.findMany({ where: { id: { in: a.projectIds } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } });
+    return { global: false, projects: list };
+  }
+  if (GLOBAL_ROLES.has(user.role)) return { global: true, projects: null };
+  const list = (
+    await prisma.projectUser.findMany({
+      where: { userId: user.id },
+      include: { project: { select: { id: true, name: true } } },
+      orderBy: { project: { createdAt: "asc" } },
+    })
+  ).map((pu) => pu.project);
+  return { global: false, projects: list };
 }
 
 export async function resolveActiveProject(
@@ -30,15 +51,10 @@ export async function resolveActiveProject(
   const user = await getSessionUser();
   if (!user) return { user: null, projects: [], activeProject: null };
 
-  const projects: ProjectLite[] = GLOBAL_ROLES.has(user.role)
+  const acc = await accessOf(user);
+  const projects: ProjectLite[] = acc.global
     ? await prisma.project.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, name: true } })
-    : (
-        await prisma.projectUser.findMany({
-          where: { userId: user.id },
-          include: { project: { select: { id: true, name: true } } },
-          orderBy: { project: { createdAt: "asc" } },
-        })
-      ).map((pu) => pu.project);
+    : acc.projects || [];
 
   if (projects.length === 0) return { user, projects: [], activeProject: null };
 
@@ -50,9 +66,9 @@ export async function resolveActiveProject(
 }
 
 export async function canAccessProject(user: SessionUser, projectId: string): Promise<boolean> {
-  if (GLOBAL_ROLES.has(user.role)) return true;
-  const pu = await prisma.projectUser.findFirst({ where: { userId: user.id, projectId } });
-  return !!pu;
+  const acc = await accessOf(user);
+  if (acc.global) return true;
+  return (acc.projects || []).some((p) => p.id === projectId);
 }
 
 type Gate = { user: SessionUser } | { error: NextResponse };
@@ -79,7 +95,7 @@ export async function requireUser(): Promise<Gate> {
 export async function requireAdmin(): Promise<Gate> {
   const user = await getSessionUser();
   if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!GLOBAL_ROLES.has(user.role)) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  if (!(await accessOf(user)).global) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   return { user };
 }
 

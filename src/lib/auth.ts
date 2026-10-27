@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import type { OAuthConfig } from "next-auth/providers/oauth";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { ssoAccessOf } from "./ssoAccess";
 
 const SSO_URL = process.env.SSO_URL || "http://localhost:4600";
 
@@ -76,6 +77,8 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, user, account }) {
+      // Вхід через SSO: запамʼятовуємо id людини в SSO, за ним щоразу питаємо її доступи (SSO єдине джерело правди).
+      if (account?.provider === "fineko-sso" && user?.id) token.ssoUserId = String(user.id);
       // Для будь-якого входу беремо канонічні id/role з БД за email.
       if (user?.email || account) {
         const email = (user?.email || (token.email as string) || "").toLowerCase();
@@ -94,6 +97,12 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id as string;
         (session.user as any).role = token.role as string;
+        // Для тих, хто зайшов через SSO, роль визначає SSO (superadmin або звичайний користувач), а не локальний запис.
+        if (token.ssoUserId) {
+          (session.user as any).ssoUserId = token.ssoUserId as string;
+          const a = await ssoAccessOf(String(token.ssoUserId), session.user.email);
+          (session.user as any).role = a.global ? "superadmin" : "client";
+        }
       }
       return session;
     },
