@@ -95,6 +95,16 @@ export function Topbar({ user, projects, activeProject }: Props) {
             </Link>
           );
         })}
+        {/* Перехід у Flows: воронки, сесії, етапи й база знань проєкту — щоб усе відчувалось єдиною системою */}
+        <a
+          href={process.env.NEXT_PUBLIC_FLOWS_URL || "https://flows.fineko.space"}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-1 px-3 py-1 rounded text-xs font-medium text-fg-muted hover:text-fg hover:bg-border/30 transition-colors duration-150"
+          title="Воронки, сесії й етапи у Flows"
+        >
+          Flows ↗
+        </a>
       </nav>
 
       {/* Right */}
