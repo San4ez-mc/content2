@@ -4,6 +4,7 @@
 import { prisma } from "./prisma";
 import { DOC_PREFIX } from "./sellerBrief";
 import { sellerAdminView } from "./sellerAdmin";
+import { getDossier, dossierSummary } from "./sellerDossierStore";
 
 const cut = (s: unknown, n = 160) => {
   const t = String(s ?? "").replace(/\s+/g, " ").trim();
@@ -63,10 +64,12 @@ export async function projectKnowledgeView(projectId: string) {
   ];
 
   const seller = await sellerAdminView(projectId);
+  const dossier = await getDossier(projectId);
   return {
     projectId: project.id,
     projectName: project.name,
     sections,
+    dossier: dossierSummary(dossier ? dossier.state : null),
     seller: seller
       ? { path: "/seller", exists: seller.exists, status: seller.config.status, mode: seller.config.mode, sellerName: seller.config.sellerName,
           ready: seller.readiness.ready, missing: seller.readiness.missing, warnings: seller.readiness.warnings }
