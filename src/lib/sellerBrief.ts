@@ -224,12 +224,14 @@ export function compileBrief(i: BriefInput, telegramId?: string | null, opts: { 
 
   const proof = i.cases.length
     ? "━━━ КЕЙСИ ЕКСПЕРТА ━━━\nНаводь цифри й результати ТІЛЬКИ в дозволених формулюваннях. Якщо дозволених формулювань нема, не називай цифр і результатів із цього кейсу.\n" +
-      i.cases.map((x, n) => [
-        `${n + 1}. ${x.title}${x.niche ? ` (${x.niche})` : ""}`,
-        x.problem ? `   Ситуація: ${clip(x.problem, 300)}` : "",
-        x.solution ? `   Що зроблено: ${clip(x.solution, 400)}` : "",
-        String(x.allowedClaims || "").trim() ? `   ДОЗВОЛЕНО казати: ${clip(x.allowedClaims, 400)}` : "   ДОЗВОЛЕНИХ ФОРМУЛЮВАНЬ НЕМАЄ: розкажи лише загальну ситуацію, без цифр і результатів.",
-      ].filter(Boolean).join("\n")).join("\n")
+      // До 6 кейсів у повному обсязі (раніше склеєний кейс обрізався до 400 символів: продавець бачив лише початок першого).
+      i.cases.slice(0, 6).map((x, n) => [
+        `${n + 1}. ${x.title}${x.niche && !String(x.title).includes(String(x.niche)) ? ` (${x.niche})` : ""}`,
+        x.problem ? `   Ситуація: ${clip(x.problem, 350)}` : "",
+        x.solution ? `   Що зроблено: ${clip(x.solution, 650)}` : "",
+        String(x.allowedClaims || "").trim() ? `   ДОЗВОЛЕНО казати: ${clip(x.allowedClaims, 450)}` : "   ДОЗВОЛЕНИХ ФОРМУЛЮВАНЬ НЕМАЄ: розкажи лише загальну ситуацію, без цифр і результатів.",
+      ].filter(Boolean).join("\n")).join("\n") +
+      (i.cases.length > 6 ? `\n(Ще кейсів: ${i.cases.length - 6}; якщо людині мало цих, скажи, що експерт розповість більше.)` : "")
     : "━━━ КЕЙСИ ЕКСПЕРТА ━━━\nКейсів немає. Не вигадуй прикладів, клієнтів і результатів.";
 
   const rules = [

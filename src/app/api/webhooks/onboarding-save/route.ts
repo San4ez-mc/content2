@@ -113,6 +113,32 @@ export async function POST(req: NextRequest) {
       saved = existing
         ? await prisma.case.update({ where: { id: existing.id }, data: fields })
         : await prisma.case.create({ data: { projectId: pid, title: String(data.title || "Кейс"), ...fields } });
+    } else if (kind === "cases") {
+      // Кілька кейсів одним викликом (онбординг експерта: кожен кейс окремим записом, а не одним склеєним).
+      // Дедуп за title. replaceMerged: прибрати старий склеєний запис «Кейс експерта» (раніше всі кейси йшли ним).
+      const list: any[] = Array.isArray(data?.cases) ? data.cases : Array.isArray(data) ? data : [];
+      if (!list.length) return NextResponse.json({ ok: false, error: "cases: порожній список — очікується data.cases = [ { title, problem, solution, allowedClaims } ]" }, { status: 400 });
+      let n = 0;
+      for (const c of list) {
+        if (!c?.title) continue;
+        const prodName = c.product || c.productName;
+        const prod = prodName ? await findByName(prisma.product, "name", String(prodName)) : null;
+        const fields = {
+          niche: S(c.niche), problem: S(c.problem), solution: S(c.solution),
+          allowedClaims: S(c.allowedClaims),
+          ...(prod ? { productId: prod.id } : {}),
+        };
+        const ex = await findByName(prisma.case, "title", String(c.title));
+        if (ex) await prisma.case.update({ where: { id: ex.id }, data: fields });
+        else await prisma.case.create({ data: { projectId: pid, title: String(c.title), ...fields } });
+        n++;
+      }
+      let removedMerged = 0;
+      if (n > 0 && data?.replaceMerged) {
+        const merged = await prisma.case.findMany({ where: { projectId: pid, title: "Кейс експерта" }, select: { id: true } });
+        for (const m of merged) { try { await prisma.case.delete({ where: { id: m.id } }); removedMerged++; } catch { /* на кейс уже посилаються пости: лишаємо */ } }
+      }
+      saved = { created: n, removedMerged };
     } else if (kind === "products") {
       // Масив продуктів (етап «продукти на початку»). Append+дедуп за назвою.
       const items: any[] = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
