@@ -39,6 +39,10 @@ describe("scanAd (гейт рекламного креативу)", () => {
     expect(types({ ...good, primary: "Ви втомилися від боргів? Є вихід." })).toContain("policy");
     expect(types({ ...good, primary: "Ти у боргах і самотній?" })).toContain("policy");
   });
+  it("клікбейт і залякування ловляться", () => {
+    expect(types({ ...good, headline: "Секрети ефективності" })).toContain("policy");
+    expect(types({ ...good, overlaySub: "Знайдемо проблеми, покращимо процеси" })).toContain("policy");
+  });
   it("ситуація замість особи — проходить", () => {
     expect(scanAd({ ...good, primary: "Повідомлення клієнтів губляться між чатами. Покажу, як зібрати їх в одному місці." })).toEqual([]);
   });
