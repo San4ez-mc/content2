@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { AD_ANGLES, AD_NETWORK_RULES, AD_PLATFORM_KEY } from "@/lib/adRules";
 
 // Канонічний набір структур постів (скелетів). Per-project, засівається при створенні
 // проєкту (щоб не було порожньо). platforms = яким мережам, postTypes = яким форматам.
@@ -80,6 +81,12 @@ export const DEFAULT_STRUCTURES: StructureSeed[] = [
   { key: "carousel_bab", name: "Карусель BAB (До → Після → Міст)", platforms: ["instagram", "linkedin"], postTypes: ["carousel"], hookTypes: ["story", "stat"], structure: "Before: незадовільний стан. After: різкий контраст-доказ одразу поруч. Виклики, які заважали раніше. Bridge: 3-4 інструменти/дії, що забезпечили перехід (скріншоти/кроки). Відгук клієнта або схема мосту. CTA на діагностику.", rules: "Коли застосовувати: є реальний доведений кейс трансформації — фітнес, косметологія, бізнес-коучинг, агенції. Тільки реальні цифри й скріншоти, не вигадані.", slideRoles: ["cover", "before_after", "backup_hook", "list", "photo_numbered", "interface_walkthrough", "list", "feature_card", "case_study", "cta_button"] },
   { key: "carousel_4ps", name: "Карусель 4Ps (Обіцянка → Картинка → Доказ → Заклик)", platforms: ["instagram", "linkedin"], postTypes: ["carousel"], hookTypes: ["promise", "story"], structure: "Promise: яскрава обіцянка-заголовок. Picture: ідеальний стан/свобода/результат. Proof: емпіричні дані, графіки, відгуки. Push: заклик написати слово-тригер.", rules: "Коли застосовувати: аспіраційні продажі курсів/преміум-програм/стилю життя — особисті бренди, інфобізнес, лайфстайл-коучинг.", slideRoles: ["cover", "typographic_hook", "list", "before_after", "spec_stack", "case_study", "photo_numbered", "list", "recap_checklist", "cta_button"] },
   { key: "carousel_multi_sku", name: "Карусель «Каталог» (кілька товарів)", platforms: ["instagram"], postTypes: ["carousel"], hookTypes: ["listicle", "promise"], structure: "Тематична обкладинка-категорія. Кожен наступний слайд = один товар (фото + ціна + деталі). Зведена таблиця розмірів/варіантів. CTA перейти в біо або написати кодове слово зі знижкою.", rules: "Коли застосовувати: демонстрація товарного асортименту e-commerce/роздрібного бренду — легкий естетичний перегляд колекції без перенасичення стрічки окремими постами.", slideRoles: ["cover", "product_photo_cover", "circle_photo_frame", "product_photo_cover", "circle_photo_frame", "product_photo_cover", "circle_photo_frame", "product_photo_cover", "versus_matrix", "cta_button"] },
+
+  // ── Рекламні креативи Meta Ads (мережа meta_ads): кути тесту. Правила й ліміти — src/lib/adRules.ts ──
+  ...AD_ANGLES.map((a) => ({
+    key: a.key, name: a.name, platforms: [AD_PLATFORM_KEY], postTypes: a.key === "ad_video_hook" ? ["ad_video"] : ["ad_image", "ad_story", "ad_carousel"],
+    hookTypes: ["pain", "promise", "question"], structure: a.structure, rules: a.rules,
+  })),
 ];
 
 // Правила кожної мережі (тон, довжина, хештеги, лінки, алгоритм). Ключ = platformKey.
@@ -89,6 +96,7 @@ export const DEFAULT_NETWORK_RULES: Record<string, string> = {
   linkedin: "Тон: «Ви», експертно, B2B, з цифрами. 800-2000 символів. Хук з першого рядка. Хештеги 3-5. Посилання ТІЛЬКИ в перший коментар, не в тіло поста (алгоритм знижує охоплення постів із зовнішніми лінками). Тільки реальні кейси, без вигаданих історій.",
   telegram: "Тон: особистий, «Ви/ти». Довжина довільна. 2-4 emoji. Без хештегів. Посилання inline — ок.",
   tiktok: "Короткі вертикальні відео 9:16, 12-18 с. Перші 3 секунди вирішують: конфлікт або питання в кадрі й на екрані. Субтитри/написи завжди (дивляться без звуку). Один персонаж, один стиль. Підпис коротко: 1-2 речення + заклик + 3-5 хештегів. Посилання — лише в шапці профілю.",
+  meta_ads: AD_NETWORK_RULES,
   youtube: "Shorts 9:16, до 60 с (оптимально 12-18). Перші 3 секунди вирішують, написи завжди. Назва ≤100 символів з хуком, опис — коротко + посилання, в кінці #Shorts. Один персонаж, один стиль.",
 };
 
@@ -149,4 +157,38 @@ export async function seedDefaultSocialNetworks(projectId: string): Promise<{ cr
     created++;
   }
   return { created };
+}
+
+/** Вмикає для проєкту «мережу» рекламних креативів Meta (FB/IG): мережа + правила + формати. Не публікується автоматично. Ідемпотентно. */
+export async function seedAdsNetwork(projectId: string): Promise<{ networkId: string; created: boolean }> {
+  const existing = await prisma.socialNetwork.findFirst({ where: { projectId, platformKey: AD_PLATFORM_KEY } });
+  let networkId = existing?.id || "";
+  let created = false;
+  if (!existing) {
+    const count = await prisma.socialNetwork.count({ where: { projectId } });
+    const n = await prisma.socialNetwork.create({
+      data: {
+        projectId, name: "Реклама FB/IG (креативи)", platformKey: AD_PLATFORM_KEY, icon: "🎯", color: "#1877f2",
+        isEnabled: true, sortOrder: count, linkPlacement: "inline", rules: AD_NETWORK_RULES,
+        sendToTelegram: false, postDirectly: false, autopostSlug: null,
+      },
+    });
+    networkId = n.id;
+    created = true;
+  } else if (!existing.rules) {
+    await prisma.socialNetwork.update({ where: { id: existing.id }, data: { rules: AD_NETWORK_RULES } });
+  }
+  // Лише рекламні структури (не чіпаємо правки клієнта в інших: seedDefaultStructures перезаписує за ключем).
+  const have = new Set((await prisma.structure.findMany({ where: { projectId }, select: { skeletonKey: true } })).map((x) => x.skeletonKey));
+  for (const s of DEFAULT_STRUCTURES.filter((x) => x.platforms.includes(AD_PLATFORM_KEY) && !have.has(x.key))) {
+    await prisma.structure.create({
+      data: {
+        projectId, prompt: "", name: s.name, structure: s.structure, platforms: s.platforms as any, postTypes: s.postTypes as any,
+        hookTypes: s.hookTypes as any, skeletonKey: s.key, rules: s.rules ?? null, sortOrder: 900,
+      },
+    });
+  }
+  const { seedDefaultFormats } = await import("@/lib/formatsSeed");
+  await seedDefaultFormats(projectId);
+  return { networkId, created };
 }

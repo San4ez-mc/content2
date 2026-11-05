@@ -5,6 +5,7 @@ import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
 import { vectorSearch } from "@/lib/vector";
 import { scanWriting, lengthViolation } from "@/lib/writingGate";
+import { scanAd, AD_PLATFORM_KEY } from "@/lib/adRules";
 import { resolveCaseIntegrity as resolveCaseIntegrityPure, type CaseRef } from "@/lib/caseIntegrity";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 import { pickNetwork, networkKeyCandidates } from "@/lib/platformKeys";
@@ -199,6 +200,13 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
   const funnelSlug = (params.funnel_slug as string) || null;
   let funnelParams: any = (params.funnel_params as any) || null;
   if (typeof funnelParams === "string") { try { funnelParams = JSON.parse(funnelParams); } catch { funnelParams = null; } }
+  // Реклама Meta: креатив мусить пройти гейт adRules (як текст проходить writingGate).
+  if (network.platformKey === AD_PLATFORM_KEY) {
+    const adViol = funnelParams?.ad ? scanAd(funnelParams.ad) : [{ type: "no_ad", detail: "нема funnel_params.ad (primary, headline, cta, link, overlayTitle…)" }];
+    if (adViol.length > 0) {
+      return NextResponse.json({ ok: false, error: "Креатив НЕ збережено — не пройшов правила реклами Meta. Виправ за списком і виклич create_post знову.", violations: adViol.map((v) => v.detail) });
+    }
+  }
   const needsGeneration = Boolean(funnelSlug && funnelSlug !== "text_only");
 
   // #314: якщо палітру явно не задано — обираємо наступну по колу (ротація).

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess, isGateError } from "@/lib/tenant";
-import { DEFAULT_NETWORK_RULES } from "@/lib/seedStructures";
+import { DEFAULT_NETWORK_RULES, seedAdsNetwork } from "@/lib/seedStructures";
 import { DEFAULT_LINK_PLACEMENT, seedDefaultFormats } from "@/lib/formatsSeed";
 
 export async function GET(req: NextRequest) {
@@ -23,6 +23,13 @@ export async function POST(req: NextRequest) {
   const { projectId, name, platformKey, icon, color, sortOrder, rules } = body;
   const gate = await requireProjectAccess(projectId);
   if (isGateError(gate)) return gate.error;
+
+  // Реклама FB/IG: не публікується з платформи (sendToTelegram/postDirectly вимкнені), свої структури й формати.
+  if (platformKey === "meta_ads") {
+    const r = await seedAdsNetwork(projectId);
+    const existing = await prisma.socialNetwork.findUnique({ where: { id: r.networkId } });
+    return NextResponse.json(existing);
+  }
 
   const network = await prisma.socialNetwork.create({
     // Нова мережа одразу отримує канонічні правила + куди йде лінк (можна відредагувати).

@@ -23,12 +23,17 @@ export const DEFAULT_FORMATS: FormatSeed[] = [
   { platform: "tiktok", key: "slideshow", name: "Слайдшоу", mediaTypes: ["image_music"], aspect: "9:16" },
   // YouTube
   { platform: "youtube", key: "short", name: "Shorts", mediaTypes: ["video"], aspect: "9:16", settings: { subtitles: true } },
+  // Реклама Meta (Facebook + Instagram): креатив для Ads Manager, не публікується з платформи
+  { platform: "meta_ads", key: "ad_image", name: "Креатив у стрічку (4:5)", mediaTypes: ["text_on_image", "image"], aspect: "4:5", settings: { placement: "feed" } },
+  { platform: "meta_ads", key: "ad_story", name: "Креатив Stories/Reels (9:16)", mediaTypes: ["text_on_image", "image"], aspect: "9:16", settings: { placement: "stories_reels", safeTop: 250, safeBottom: 340 } },
+  { platform: "meta_ads", key: "ad_carousel", name: "Карусель-реклама (1:1)", mediaTypes: ["carousel"], aspect: "1:1", settings: { placement: "feed" } },
+  { platform: "meta_ads", key: "ad_video", name: "Відео-креатив (9:16, до 15 с)", mediaTypes: ["video"], aspect: "9:16", settings: { subtitles: true, maxSeconds: 15, placement: "stories_reels" } },
 ];
 
 // Куди йде CTA-лінк (пост-лінки активні лише де можна: коментар/inline/опис).
 export const DEFAULT_LINK_PLACEMENT: Record<string, string> = {
   instagram: "bio", threads: "comment", linkedin: "comment", telegram: "inline",
-  tiktok: "bio", youtube: "description", youtube_shorts: "description", facebook: "inline",
+  tiktok: "bio", youtube: "description", youtube_shorts: "description", facebook: "inline", meta_ads: "inline",
 };
 
 // Засів форматів для мереж проєкту (ідемпотентно за socialNetworkId+key).

@@ -10,9 +10,13 @@ describe("normalizeFormat (єдиний словник форматів)", () =>
     expect(normalizeFormat("single")).toBe("post");
   });
   it("канонічні лишає як є", () => {
-    for (const k of ["post", "story", "reel", "carousel", "thread", "short", "slideshow"]) {
+    for (const k of ["post", "story", "reel", "carousel", "thread", "short", "slideshow", "ad_image", "ad_story", "ad_carousel", "ad_video"]) {
       expect(normalizeFormat(k)).toBe(k);
     }
+  });
+  it("рекламні формати Meta не зводяться в post", () => {
+    expect(normalizeFormat("ad_feed")).toBe("ad_image");
+    expect(normalizeFormat("ad_reel")).toBe("ad_video");
   });
   it("невідоме/порожнє → post", () => {
     expect(normalizeFormat("xyz")).toBe("post");
@@ -27,5 +31,8 @@ describe("formatToPostGroupType (сумісність із legacy enum)", () => 
     expect(formatToPostGroupType("thread")).toBe("thread_chain");
     expect(formatToPostGroupType("reel")).toBe("stories");
     expect(formatToPostGroupType("post")).toBe("single");
+    expect(formatToPostGroupType("ad_carousel")).toBe("carousel");
+    expect(formatToPostGroupType("ad_image")).toBe("single");
+    expect(formatToPostGroupType("ad_video")).toBe("stories");
   });
 });

@@ -33,6 +33,7 @@ const PLATFORM_PRESETS = [
   { platformKey: "telegram", name: "Telegram", icon: "✈️", color: "#0088cc" },
   { platformKey: "facebook", name: "Facebook", icon: "📘", color: "#1877f2" },
   { platformKey: "youtube", name: "YouTube Shorts", icon: "▶️", color: "#ef4444" },
+  { platformKey: "meta_ads", name: "Реклама FB/IG (креативи)", icon: "🎯", color: "#1877f2" },
 ];
 
 export function NetworksView({ projectId, networks: initial, schedule: initialSchedule }: Props) {

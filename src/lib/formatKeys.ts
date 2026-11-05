@@ -1,7 +1,7 @@
 // ЄДИНИЙ словник форматів для всієї платформи й ботів. Раніше було 3 різні набори:
 // генератор (post/stories/reels/thread_chain…), формати (post/story/reel…), enum
 // PostGroupType (single/carousel/thread_chain/stories). Тепер канон — оці ключі.
-export const FORMAT_KEYS = ["post", "story", "reel", "carousel", "thread", "short", "slideshow"] as const;
+export const FORMAT_KEYS = ["post", "story", "reel", "carousel", "thread", "short", "slideshow", "ad_image", "ad_story", "ad_carousel", "ad_video"] as const;
 export type FormatKey = (typeof FORMAT_KEYS)[number];
 
 // Аліаси: будь-який старий/генераторний post_type → канонічний формат.
@@ -13,6 +13,11 @@ const FORMAT_ALIASES: Record<string, string> = {
   thread: "thread", thread_chain: "thread", thread_short: "thread", thread_question: "thread", chain: "thread",
   short: "short", shorts: "short", video: "reel", tiktok_video: "reel", youtube_short: "short",
   slideshow: "slideshow",
+  // Рекламні креативи Meta Ads (мережа meta_ads)
+  ad_image: "ad_image", ad_feed: "ad_image", ad: "ad_image",
+  ad_story: "ad_story", ad_stories: "ad_story",
+  ad_carousel: "ad_carousel",
+  ad_video: "ad_video", ad_reel: "ad_video",
 };
 
 export function normalizeFormat(input: unknown): string {
@@ -23,9 +28,9 @@ export function normalizeFormat(input: unknown): string {
 // Канонічний формат → застарілий enum PostGroupType (для сумісності зі старим полем `type`).
 export function formatToPostGroupType(format: string | null): "single" | "carousel" | "thread_chain" | "stories" {
   switch (format) {
-    case "carousel": return "carousel";
+    case "carousel": case "ad_carousel": return "carousel";
     case "thread": return "thread_chain";
-    case "story": case "reel": case "short": case "slideshow": return "stories";
+    case "story": case "reel": case "short": case "slideshow": case "ad_story": case "ad_video": return "stories";
     default: return "single";
   }
 }

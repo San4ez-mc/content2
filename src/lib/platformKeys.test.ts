@@ -10,6 +10,13 @@ describe("platformKeys", () => {
     expect(resolvePlatformKey("tiktok_video")).toBe("tiktok");
     expect(resolvePlatformKey("TikTok")).toBe("tiktok");
   });
+  it("реклама FB/IG — окрема мережа meta_ads, не Instagram", () => {
+    expect(resolvePlatformKey("fb_ads")).toBe("meta_ads");
+    expect(resolvePlatformKey("Instagram_Ads")).toBe("meta_ads");
+    const n = nets("instagram", "meta_ads");
+    expect(pickNetwork(n, "ads")?.platformKey).toBe("meta_ads");
+    expect(pickNetwork(nets("instagram"), "ads")).toBeUndefined();
+  });
   it("порожнє → instagram_posts (як і раніше)", () => {
     expect(resolvePlatformKey("")).toBe("instagram_posts");
     expect(resolvePlatformKey(undefined)).toBe("instagram_posts");

@@ -26,6 +26,15 @@ export const PLATFORM_MAP: Record<string, string> = {
   telegram_post: "telegram",
   x: "x",
   twitter: "x",
+  // Рекламні креативи Facebook/Instagram (окрема «мережа»: не публікується, вантажиться в Ads Manager)
+  meta_ads: "meta_ads",
+  ads: "meta_ads",
+  ad: "meta_ads",
+  fb_ads: "meta_ads",
+  facebook_ads: "meta_ads",
+  instagram_ads: "meta_ads",
+  ad_creative: "meta_ads",
+  ad_creatives: "meta_ads",
 };
 
 export function resolvePlatformKey(platform: unknown): string {

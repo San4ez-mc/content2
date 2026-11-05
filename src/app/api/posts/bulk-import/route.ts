@@ -5,6 +5,7 @@ import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 import { scanWriting, lengthViolation } from "@/lib/writingGate";
+import { scanAd, formatAdContent, AD_PLATFORM_KEY } from "@/lib/adRules";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
@@ -182,11 +183,23 @@ export async function POST(req: NextRequest) {
     // C3 батч-критик: пост із порушеннями стандарту письма НЕ йде в графік —
     // тримаємо як draft (на перевірку), а не «scheduled» (авто-публікація).
     // Скелет — завжди draft (текст напишеться на фазі J-2); інакше critic вирішує.
-    const groupStatus = skeletonMode ? "draft" : ((scanWriting(String(p.content || "")).length > 0 || lengthViolation(network.platformKey, String(p.content || "")).length > 0) ? "draft" : "scheduled");
-
     // funnel_slug + funnel_params from new bot format
     const funnelSlug: string | null = p.funnel_slug || null;
     let funnelParams: Record<string, unknown> | null = p.funnel_params || null;
+
+    // Реклама Meta (мережа meta_ads): креатив перевіряє детермінований гейт adRules (ліміти, політика Meta, жаргон).
+    // З порушеннями — draft + список у funnel_params.adViolations, щоб людина бачила, що виправити.
+    let adViolations: string[] = [];
+    if (network.platformKey === AD_PLATFORM_KEY) {
+      const ad: any = (funnelParams as any)?.ad;
+      adViolations = ad ? scanAd(ad).map((x) => x.detail) : ["нема funnel_params.ad (структури креативу)"];
+      if (adViolations.length) funnelParams = { ...(funnelParams || {}), adViolations };
+    }
+    // Блок тексту креативу (для копіювання в Ads Manager) збираємо тут з структури — одне місце для всіх воронок.
+    if (network.platformKey === AD_PLATFORM_KEY && !String(p.content || "").trim() && (funnelParams as any)?.ad) {
+      p.content = formatAdContent((funnelParams as any).ad);
+    }
+    const groupStatus = skeletonMode ? "draft" : ((scanWriting(String(p.content || "")).length > 0 || lengthViolation(network.platformKey, String(p.content || "")).length > 0 || adViolations.length > 0) ? "draft" : "scheduled");
 
     // Backward compat: if no funnel_slug but has media_type, derive funnel_slug
     const derivedFunnelSlug = funnelSlug || deriveSlugFromMediaType(p.media_type);
