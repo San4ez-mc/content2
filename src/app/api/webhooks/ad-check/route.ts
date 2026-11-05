@@ -3,7 +3,7 @@ import { scanAd } from "@/lib/adRules";
 
 // Перевірка рекламних креативів Meta за правилами (src/lib/adRules.ts): єдине джерело правди для воронок
 // ads-creative-image / ads-creative-video. Воронка не тримає власної копії ліміт/політика-правил.
-// Body: { ads: AdCreative[], requireLink?: boolean }  →  { ok, anyBad, results: [{ index, violations: string[] }] }
+// Body: { ads: AdCreative[], requireLink?: boolean } (посилання за замовчуванням необовʼязкове)  →  { ok, anyBad, results: [{ index, violations: string[] }] }
 // Auth: x-webhook-secret === WEBHOOK_SECRET.
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const ads = Array.isArray(body.ads) ? body.ads : [];
   const results = ads.map((ad, index) => ({
     index,
-    violations: scanAd((ad || {}) as any, { requireLink: body.requireLink !== false }).map((v) => v.detail),
+    violations: scanAd((ad || {}) as any, { requireLink: body.requireLink === true }).map((v) => v.detail),
   }));
   return NextResponse.json({ ok: true, anyBad: results.some((r) => r.violations.length > 0), results });
 }

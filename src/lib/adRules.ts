@@ -99,9 +99,9 @@ export function scanAd(ad: Partial<AdCreative>, opts: { requireLink?: boolean } 
     if (chars(firstLine) > AD_LIMITS.primaryVisible) add("hook_hidden", `перший рядок ${chars(firstLine)} символів: думка обріжеться після ${AD_LIMITS.primaryVisible} (поставь суть у перші ${AD_LIMITS.primaryVisible})`);
   }
   if (!ad.cta || !AD_CTA_BUTTONS.includes(ad.cta)) add("bad_cta", `кнопка «${ad.cta || ""}» не зі списку: ${AD_CTA_BUTTONS.join(", ")}`);
-  if (opts.requireLink !== false) {
-    if (!ad.link || !/^https?:\/\//i.test(ad.link)) add("no_link", "нема посилання призначення (https://…)");
-  }
+  // Посилання необовʼязкове: його часто додають безпосередньо в кабінеті Meta. Якщо задано, мусить бути https.
+  if (ad.link && !/^https?:\/\//i.test(ad.link)) add("bad_link", "посилання має починатися з https://");
+  if (opts.requireLink === true && !ad.link) add("no_link", "нема посилання призначення (https://…)");
 
   const ot = String(ad.overlayTitle || "").trim();
   const os = String(ad.overlaySub || "").trim();
@@ -129,7 +129,7 @@ export function formatAdContent(ad: Partial<AdCreative>): string {
     `Заголовок: ${ad.headline || ""}`,
     ad.description ? `Опис: ${ad.description}` : "",
     `Кнопка: ${ad.cta || ""}`,
-    `Посилання: ${ad.link || ""}`,
+    `Посилання: ${ad.link || "додається в Ads Manager"}`,
     ad.overlayTitle ? `Текст на картинці: ${ad.overlayTitle}${ad.overlaySub ? ` / ${ad.overlaySub}` : ""}` : "",
   ].filter(Boolean).join("\n");
 }

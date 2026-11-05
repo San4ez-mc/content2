@@ -27,8 +27,9 @@ describe("scanAd (гейт рекламного креативу)", () => {
   });
   it("кнопка лише зі списку, посилання обов'язкове", () => {
     expect(types({ ...good, cta: "Купуй зараз" })).toContain("bad_cta");
-    expect(types({ ...good, link: "" })).toContain("no_link");
-    expect(types({ ...good, link: "" }, { requireLink: false })).not.toContain("no_link");
+    expect(types({ ...good, link: "" })).not.toContain("no_link"); // посилання додають у кабінеті Meta
+    expect(types({ ...good, link: "" }, { requireLink: true })).toContain("no_link");
+    expect(types({ ...good, link: "ftp://x" })).toContain("bad_link");
     for (const b of AD_CTA_BUTTONS) expect(types({ ...good, cta: b })).not.toContain("bad_cta");
   });
   it("політика Meta: гарантії, доходи, назва мережі, особисті ознаки", () => {
