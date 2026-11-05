@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
     if (network.platformKey === AD_PLATFORM_KEY && !String(p.content || "").trim() && (funnelParams as any)?.ad) {
       p.content = formatAdContent((funnelParams as any).ad);
     }
-    const groupStatus = skeletonMode ? "draft" : ((scanWriting(String(p.content || "")).length > 0 || lengthViolation(network.platformKey, String(p.content || "")).length > 0 || adViolations.length > 0) ? "draft" : "scheduled");
+    const groupStatus = skeletonMode ? "draft" : (((network.platformKey !== AD_PLATFORM_KEY && scanWriting(String(p.content || "")).length > 0) || lengthViolation(network.platformKey, String(p.content || "")).length > 0 || adViolations.length > 0) ? "draft" : "scheduled");
 
     // Backward compat: if no funnel_slug but has media_type, derive funnel_slug
     const derivedFunnelSlug = funnelSlug || deriveSlugFromMediaType(p.media_type);
