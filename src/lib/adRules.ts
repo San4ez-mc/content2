@@ -18,9 +18,14 @@ export const AD_LIMITS = {
   descriptionMax: 30,     // опис (часто не показується)
   primaryVisible: 125,    // скільки видно без «ще»
   primaryMax: 500,        // жорстка стеля, щоб не писати простирадла
-  overlayTitleWords: 8,   // текст на картинці: заголовок
-  overlayTitleChars: 60,
-  overlaySubWords: 12,    // текст на картинці: підзаголовок
+  overlayTitleWords: 14,  // текст на картинці: заголовок (ситуація/цифра, яку власник впізнає)
+  overlayTitleChars: 100,
+  overlaySubWords: 14,    // нижня плашка: пропозиція простими словами
+  audienceChars: 45,      // плашка «для кого»
+  accentWords: 6,         // велика акцентна цифра/фраза
+  overlayTotalWords: 50,  // весь текст на картинці разом
+  pointsMax: 3,           // пунктів у списковому креативі
+  pointWords: 10,         // слів у пункті
   emojiMax: 2,
   exclamationMax: 1,
 };
@@ -70,8 +75,13 @@ export type AdCreative = {
   description?: string;      // опис (до 30)
   cta: string;               // назва кнопки
   link: string;              // посилання призначення (https)
+  audience?: string;         // плашка «для кого» на картинці
   overlayTitle?: string;     // текст НА картинці: заголовок
-  overlaySub?: string;       // текст НА картинці: підзаголовок
+  accent?: string;           // велика акцентна цифра/фраза під заголовком (необовʼязково)
+  points?: string[];         // 2-3 короткі пункти (списковий креатив, необовʼязково)
+  layout?: string;           // headline_illustration | before_after | list
+  overlaySub?: string;       // нижня плашка: пропозиція простими словами
+  pain?: string;             // id болю з каталогу (A2, B1…) для відстеження
   visual?: string;           // опис картинки (EN) для генератора, без тексту й логотипів у кадрі
   aspect?: string;           // 4:5 | 9:16 | 1:1
   leadMagnet?: string | null;
@@ -109,9 +119,18 @@ export function scanAd(ad: Partial<AdCreative>, opts: { requireLink?: boolean } 
   const os = String(ad.overlaySub || "").trim();
   if (ot && (words(ot) > AD_LIMITS.overlayTitleWords || chars(ot) > AD_LIMITS.overlayTitleChars)) add("overlay_title_long", `текст на картинці: ${words(ot)} слів / ${chars(ot)} символів (макс ${AD_LIMITS.overlayTitleWords} слів і ${AD_LIMITS.overlayTitleChars} символів)`);
   if (os && words(os) > AD_LIMITS.overlaySubWords) add("overlay_sub_long", `підзаголовок на картинці ${words(os)} слів (макс ${AD_LIMITS.overlaySubWords})`);
+  const au = String(ad.audience || "").trim();
+  const ac = String(ad.accent || "").trim();
+  if (au && chars(au) > AD_LIMITS.audienceChars) add("audience_long", `плашка «для кого» ${chars(au)} символів (макс ${AD_LIMITS.audienceChars})`);
+  if (ac && words(ac) > AD_LIMITS.accentWords) add("accent_long", `акцент на картинці ${words(ac)} слів (макс ${AD_LIMITS.accentWords})`);
+  const pts = Array.isArray(ad.points) ? ad.points.map((x) => String(x || "").trim()).filter(Boolean) : [];
+  if (pts.length > AD_LIMITS.pointsMax) add("points_many", `пунктів ${pts.length} (макс ${AD_LIMITS.pointsMax})`);
+  for (const x of pts) if (words(x) > AD_LIMITS.pointWords) add("point_long", `пункт «${x.slice(0, 30)}…» ${words(x)} слів (макс ${AD_LIMITS.pointWords})`);
+  const totalWords = words(au) + words(ot) + words(ac) + words(os) + pts.reduce((n, x) => n + words(x), 0);
+  if (totalWords > AD_LIMITS.overlayTotalWords) add("overlay_total", `усього тексту на картинці ${totalWords} слів (макс ${AD_LIMITS.overlayTotalWords})`);
   if (ad.aspect && !AD_ASPECTS[ad.aspect]) add("bad_aspect", `формат «${ad.aspect}» не підтримується (4:5, 1:1, 9:16)`);
 
-  const all = [primary, headline, description, ot, os].join("\n");
+  const all = [primary, headline, description, au, ot, ac, os, ...pts].join("\n");
   if (emojiCount(primary) > AD_LIMITS.emojiMax) add("emoji", `емодзі в основному тексті: ${emojiCount(primary)} (макс ${AD_LIMITS.emojiMax})`);
   if ((all.match(/!/g) || []).length > AD_LIMITS.exclamationMax) add("exclamation", `знаків оклику більше ${AD_LIMITS.exclamationMax}`);
   const caps = (all.match(new RegExp(L0 + "[А-ЯІЇЄҐA-Z]{4,}" + L1, "gu")) || []).filter((w) => !/^(CRM|API|GPT|PDF|SMM)$/.test(w));
@@ -132,7 +151,7 @@ export function formatAdContent(ad: Partial<AdCreative>): string {
     ad.description ? `Опис: ${ad.description}` : "",
     `Кнопка: ${ad.cta || ""}`,
     `Посилання: ${ad.link || "додається в Ads Manager"}`,
-    ad.overlayTitle ? `Текст на картинці: ${ad.overlayTitle}${ad.overlaySub ? ` / ${ad.overlaySub}` : ""}` : "",
+    ad.overlayTitle ? `Текст на картинці: ${[ad.audience, ad.overlayTitle, ad.accent, ...(Array.isArray(ad.points) ? ad.points : []), ad.overlaySub].filter(Boolean).join(" / ")}` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -141,7 +160,7 @@ export const AD_NETWORK_RULES = [
   "РЕКЛАМНІ КРЕАТИВИ Facebook / Instagram (Meta Ads). Це НЕ пости для стрічки: креатив купує перегляд у холодної аудиторії і веде до ОДНІЄЇ дії. Публікуємо не ми — креатив вантажиться в Ads Manager вручну.",
   "1) ОДИН креатив = одна аудиторія + одна думка + одна дія. Не змішуй кілька пропозицій. Кожен новий креатив у наборі перевіряє ОДНУ змінну (інший біль, інший вхід, інший доказ).",
   "2) Структура: основний текст (суть у перших 125 символах, бо далі «ще»), заголовок ≤ 40 символів, опис ≤ 30, кнопка зі списку (Дізнатися більше, Зв'язатися з нами, Записатися, Надіслати повідомлення, Завантажити, Отримати пропозицію), посилання https.",
-  "3) Текст НА картинці: заголовок ≤ 8 слів (≤ 60 символів), підзаголовок ≤ 12 слів. Великий шрифт, читається на телефоні без зуму. Менше тексту краще: картинка показує ситуацію, слова пояснюють вигоду.",
+  "3) Текст НА картинці (креатив має бути зрозумілий за 2 секунди: кому, про що, що пропонують): плашка «для кого» (≤ 45 символів), заголовок із ситуацією або цифрою (≤ 14 слів), за потреби велика акцентна цифра (≤ 6 слів), нижня плашка з пропозицією простими словами (≤ 14 слів); усього ≤ 50 слів (для спискового креатива замість акценту 2-3 короткі пункти). Ілюстрація показує саме біль (чат із непрочитаним, «було → стало», одна людина в центрі системи), а не стокову картинку.",
   "4) Розміри: стрічка 4:5 (1080×1350), карусель 1:1 (1080×1080), Stories/Reels 9:16 (1080×1920). У 9:16 верхні 250 px і нижні 340 px порожні від тексту й логотипів (там інтерфейс Meta).",
   "5) Відео: 9:16, до 15 секунд, суть за перші 3 секунди, субтитри обов'язкові (дивляться без звуку), без обличчя можна. Заклик до дії озвучуй у підписі/кнопці, а не «запікай» у кадр (він змінюється).",
   "6) Прості слова: без «воронка, лід, конверсія, оптимізація, масштабування, екосистема, трансформація». Біль називай словами клієнта, не термінами.",

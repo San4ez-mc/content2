@@ -20,7 +20,11 @@ describe("scanAd (гейт рекламного креативу)", () => {
   it("ліміти: заголовок > 40, опис > 30, текст на картинці", () => {
     expect(types({ ...good, headline: "а".repeat(41) })).toContain("headline_long");
     expect(types({ ...good, description: "а".repeat(31) })).toContain("description_long");
-    expect(types({ ...good, overlayTitle: "один два три чотири п'ять шість сім вісім дев'ять" })).toContain("overlay_title_long");
+    expect(types({ ...good, overlayTitle: "один два три чотири п'ять шість сім вісім дев'ять десять одинадцять дванадцять тринадцять чотирнадцять п'ятнадцять" })).toContain("overlay_title_long");
+    expect(types({ ...good, audience: "а".repeat(46) })).toContain("audience_long");
+    expect(types({ ...good, accent: "раз два три чотири п'ять шість сім" })).toContain("accent_long");
+    const w = (n: number) => Array.from({ length: n }, (_, k) => "слово" + String.fromCharCode(97 + k)).join(" ");
+    expect(types({ ...good, audience: w(18), overlayTitle: w(14), accent: w(6), overlaySub: w(14) })).toContain("overlay_total");
   });
   it("суть має вкластися в перші 125 символів першого рядка", () => {
     expect(types({ ...good, primary: "а".repeat(140) })).toContain("hook_hidden");
@@ -42,6 +46,13 @@ describe("scanAd (гейт рекламного креативу)", () => {
   it("клікбейт і залякування ловляться", () => {
     expect(types({ ...good, headline: "Секрети ефективності" })).toContain("policy");
     expect(types({ ...good, overlaySub: "Знайдемо проблеми, покращимо процеси" })).toContain("policy");
+  });
+  it("новий формат креатива: плашка + заголовок із цифрою + акцент + пропозиція проходить", () => {
+    expect(scanAd({ ...good, audience: "Для власників і керівників команд", overlayTitle: "Менеджер витрачає 2 години на день на ручну рутину", accent: "= 40 годин на місяць", overlaySub: "Розбір процесу: 1 зустріч → PDF-план, що автоматизувати" })).toEqual([]);
+  });
+  it("списковий креатив: до 3 пунктів по ≤10 слів", () => {
+    expect(scanAd({ ...good, points: ["Взялись за все одразу", "Зробили, але ніхто не користується", "Немає плану"] })).toEqual([]);
+    expect(types({ ...good, points: ["а", "б", "в", "г"] })).toContain("points_many");
   });
   it("ситуація замість особи — проходить", () => {
     expect(scanAd({ ...good, primary: "Повідомлення клієнтів губляться між чатами. Покажу, як зібрати їх в одному місці." })).toEqual([]);
