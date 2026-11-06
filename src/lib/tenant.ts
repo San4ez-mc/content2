@@ -14,6 +14,7 @@ export type ProjectLite = { id: string; name: string };
 // superadmin/admin бачать усі проєкти; client — лише свої (ProjectUser).
 const GLOBAL_ROLES = new Set(["superadmin", "admin"]);
 
+// Архівні проєкти (isActive=false) не показуються в перемикачі й не стають активними; дані лишаються, повернути можна в адмінці.
 // Активна компанія — єдине джерело істини для всіх сторінок дашборду (#перемикач
 // у Topbar). Пріоритет: явний override (напр. ?projectId= у deep-лінку) > кука > перша.
 export const ACTIVE_PROJECT_COOKIE = "active_project_id";
@@ -31,13 +32,13 @@ async function accessOf(user: SessionUser): Promise<{ global: boolean; projects:
     const a = await ssoAccessOf(user.ssoUserId, user.email);
     if (a.global) return { global: true, projects: null };
     if (!a.projectIds.length) return { global: false, projects: [] };
-    const list = await prisma.project.findMany({ where: { id: { in: a.projectIds } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } });
+    const list = await prisma.project.findMany({ where: { id: { in: a.projectIds }, isActive: true }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } });
     return { global: false, projects: list };
   }
   if (GLOBAL_ROLES.has(user.role)) return { global: true, projects: null };
   const list = (
     await prisma.projectUser.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, project: { isActive: true } },
       include: { project: { select: { id: true, name: true } } },
       orderBy: { project: { createdAt: "asc" } },
     })
@@ -53,7 +54,7 @@ export async function resolveActiveProject(
 
   const acc = await accessOf(user);
   const projects: ProjectLite[] = acc.global
-    ? await prisma.project.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, name: true } })
+    ? await prisma.project.findMany({ where: { isActive: true }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } })
     : acc.projects || [];
 
   if (projects.length === 0) return { user, projects: [], activeProject: null };
