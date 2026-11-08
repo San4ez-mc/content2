@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn, PLATFORM_META, STATUS_META } from "@/lib/utils";
 import { PostModal } from "@/components/posts/PostModal";
+import { AdsGallery } from "@/components/ads/AdsView";
 import { QuickCreateModal } from "@/components/posts/QuickCreateModal";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth, isToday, parseISO } from "date-fns";
 import { uk } from "date-fns/locale";
@@ -191,6 +192,8 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
     router.push(`/?month=${format(d, "yyyy-MM")}`);
   }
 
+  const isAdsNetwork = socialNetworks.find((n) => n.id === activeNetwork)?.platformKey === "meta_ads";
+
   return (
     <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden">
       {/* Toolbar */}
@@ -202,6 +205,7 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
             {format(new Date(year, month - 1), "LLLL yyyy", { locale: uk })}
           </span>
           <button onClick={nextMonth} className="btn-ghost px-2 py-1">›</button>
+          <button onClick={() => router.push("/")} className="btn-ghost px-2 py-1 text-xs" title="Повернутись до поточного місяця">Сьогодні</button>
         </div>
 
         <div className="w-px h-4 bg-border" />
@@ -345,8 +349,15 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
         </div>
       )}
 
+      {/* Реклама FB/IG: замість місячної сітки — галерея креативів (усі місяці) */}
+      {isAdsNetwork && searchQ.length < 2 && (
+        <div className="flex-1 overflow-auto p-3">
+          <AdsGallery projectId={activeProject.id} />
+        </div>
+      )}
+
       {/* Calendar grid */}
-      <div className={cn("flex-1 overflow-auto p-3", searchQ.length >= 2 && "hidden")}>
+      <div className={cn("flex-1 overflow-auto p-3", (searchQ.length >= 2 || isAdsNetwork) && "hidden")}>
         {/* DOW headers — hidden on mobile (days stack vertically there) */}
         <div className="hidden sm:grid grid-cols-7 gap-1.5 mb-1.5">
           {DOW.map((d) => (

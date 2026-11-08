@@ -19,7 +19,6 @@ const NAV = [
   { href: "/structures", label: "Структури" },
   { href: "/tools", label: "Воронки" },
   { href: "/networks", label: "Мережі" },
-  { href: "/ads", label: "Реклама" },
   { href: "/stats", label: "Статистика" },
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 type Ad = {
@@ -81,7 +82,17 @@ function Card({ r }: { r: Row }) {
   );
 }
 
-export function AdsView({ projectName, hasNetwork, rows }: { projectName: string; hasNetwork: boolean; rows: Row[] }) {
+export function AdsGallery({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useQuery<{ rows: Row[] }>({
+    queryKey: ["adsCreatives", projectId],
+    queryFn: async () => (await fetch(`/api/ads?projectId=${projectId}`)).json(),
+    refetchInterval: 15000, // креативи дорендерюються в фоні
+  });
+  const rows = data?.rows || [];
+  return <AdsList rows={rows} loading={isLoading} />;
+}
+
+function AdsList({ rows, loading }: { rows: Row[]; loading: boolean }) {
   const [filter, setFilter] = useState<"all" | "45" | "916" | "video" | "draft">("all");
 
   const filtered = useMemo(() => rows.filter((r) => {
@@ -110,15 +121,14 @@ export function AdsView({ projectName, hasNetwork, rows }: { projectName: string
   ];
 
   return (
-    <div className="p-4 max-w-[1500px] mx-auto">
-      <div className="mb-4">
-        <h1 className="text-lg font-semibold text-fg">🎯 Реклама FB/IG: креативи</h1>
-        <p className="text-xs text-fg-muted mt-1">
-          Компанія: <b>{projectName}</b>. Креативи не публікуються самі: завантажте файл в Ads Manager і скопіюйте текст (посилання додається в кабінеті Meta).
-        </p>
-      </div>
-      {!hasNetwork ? (
-        <p className="text-sm text-fg-muted">У цій компанії ще немає рекламних креативів. Запустіть воронку «Реклама FB/IG» для цієї компанії.</p>
+    <div>
+      <p className="text-xs text-fg-muted mb-3">
+        Рекламні креативи Facebook/Instagram. Самі не публікуються: завантажте файл в Ads Manager і скопіюйте текст (посилання додається в кабінеті Meta).
+      </p>
+      {loading && rows.length === 0 ? (
+        <p className="text-sm text-fg-muted">Завантаження…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-fg-muted">Креативів ще немає. Запустіть воронку «Реклама FB/IG» для цієї компанії.</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-1.5 mb-4">
