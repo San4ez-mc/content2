@@ -72,6 +72,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_avatar": return await getAvatarTool(projectId, params);
       case "get_events": return await getEventsTool(projectId, params);
       case "update_network_rules": return await updateNetworkRules(projectId, params);
+      case "update_structure": return await updateStructure(projectId, params);
       case "get_writing_core": return await getWritingCore();
       case "check_writing": return await checkWriting(params);
       case "query_vector": return await queryVector(projectId, params);
@@ -512,6 +513,19 @@ async function getEventsTool(projectId: string, params: Record<string, unknown>)
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: "Афіша KIRO недоступна: " + e.message });
   }
+}
+
+// Оновити структуру поста за ключем (skeletonKey): { key, name?, structure?, rules?, description? }. Ключ не змінюється, тож посилання на нього лишаються робочими.
+async function updateStructure(projectId: string, params: Record<string, unknown>) {
+  const key = String(params.key || "").trim();
+  if (!key) return NextResponse.json({ ok: false, error: "key (skeletonKey) обовʼязковий" });
+  const found = await prisma.structure.findMany({ where: { projectId, skeletonKey: key }, select: { id: true } });
+  if (found.length !== 1) return NextResponse.json({ ok: false, error: found.length ? "Ключ збігається з кількома структурами" : "Структуру не знайдено" });
+  const data: Record<string, string> = {};
+  for (const f of ["name", "structure", "rules", "description"] as const) if (typeof params[f] === "string" && String(params[f]).trim()) data[f] = String(params[f]).trim();
+  if (!Object.keys(data).length) return NextResponse.json({ ok: false, error: "нема що оновлювати" });
+  await prisma.structure.update({ where: { id: found[0].id }, data });
+  return NextResponse.json({ ok: true, key, updated: Object.keys(data) });
 }
 
 // Правила мережі (текст у SocialNetwork.rules): { platform, text, mode?: "replace"|"append" }
