@@ -83,10 +83,11 @@ export async function POST(req: NextRequest) {
     const projectId = String(b.projectId || "");
     const number = Number(b.number);
     const imagePath = String(b.imagePath || "");
-    if (!projectId || !Number.isFinite(number) || !imagePath.startsWith("/uploads/")) return NextResponse.json({ ok: false, error: "projectId, number, imagePath (/uploads/…) обовʼязкові" }, { status: 400 });
+    const okPath = imagePath.startsWith("/uploads/") || imagePath.startsWith("https://kiro.fineko.space/api/v1/events/"); // свій файл або готова картка події KIRO
+    if (!projectId || !Number.isFinite(number) || !okPath) return NextResponse.json({ ok: false, error: "projectId, number, imagePath (/uploads/… або картка події KIRO) обовʼязкові" }, { status: 400 });
     const g = await prisma.postGroup.findFirst({ where: { projectId, number }, include: { items: { orderBy: { orderIndex: "asc" }, take: 1 } } });
     if (!g || !g.items[0]) return NextResponse.json({ ok: false, error: "Пост не знайдено" }, { status: 404 });
-    await prisma.postItem.update({ where: { id: g.items[0].id }, data: { imagePath, generationStatus: "done", generationError: null, imageType: "avatar" } });
+    await prisma.postItem.update({ where: { id: g.items[0].id }, data: { imagePath, generationStatus: "done", generationError: null, imageType: imagePath.startsWith("/uploads/") ? "avatar" : "event_card" } });
     return NextResponse.json({ ok: true, number, imagePath });
   }
 
