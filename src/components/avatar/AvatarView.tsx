@@ -41,7 +41,7 @@ export function AvatarView({ projectId }: { projectId: string }) {
   const avatar = data?.avatar || null;
   const photos = data?.photos || [];
   const refs = photos.filter((p) => p.folder === "avatar");
-  const generated = photos.filter((p) => p.folder === "avatar-generated");
+  const generated = photos.filter((p) => p.folder === "avatar-generated" && !/\.(mp4|mov|webm|m4v)$/i.test(p.path)); // відео в галереї фото не показуємо
   const order = avatar?.refPhotoIds || [];
   const primaryId = order[0] || refs.find((p) => p.tags.includes("ref"))?.id;
 

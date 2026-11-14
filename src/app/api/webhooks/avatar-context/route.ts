@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "save_media") {
-    const folder = b.folder === AVATAR_FOLDER ? AVATAR_FOLDER : AVATAR_GEN_FOLDER;
+    // папки: референси аватара, створене з аватара, або «source» (власні готові файли компанії, напр. відео-презентація)
+    const folder = b.folder === AVATAR_FOLDER ? AVATAR_FOLDER : b.folder === "source" ? "source" : AVATAR_GEN_FOLDER;
     let buf: Buffer;
     let mime = String(b.mimeType || "image/jpeg");
     if (b.base64) buf = Buffer.from(String(b.base64), "base64");
