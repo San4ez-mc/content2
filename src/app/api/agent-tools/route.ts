@@ -76,6 +76,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "get_cases": return await getCases(projectId);
       case "get_strategy": return await getStrategy(projectId);
       case "save_rule": return await saveRule(projectId, params);
+      case "update_rule": return await updateRule(projectId, params);
       case "save_fact": return await saveFact(projectId, params);
       case "get_facts": return await getFacts(projectId, params);
       case "expire_fact": return await expireFact(projectId, params);
@@ -612,6 +613,17 @@ async function saveRule(projectId: string, params: Record<string, unknown>) {
     data: { projectId, category, title, content, addedBy: "bot" },
   });
   return NextResponse.json({ ok: true, id: entry.id, title: entry.title });
+}
+
+// Заміна тексту наявного правила за початком заголовка (напр. «Стиль відео»): без дублювання записів у базі знань.
+async function updateRule(projectId: string, params: Record<string, unknown>) {
+  const title = String(params.title || "").trim();
+  const content = String(params.content || "").trim();
+  if (!title || !content) return NextResponse.json({ ok: false, error: "title (початок заголовка) і content обовʼязкові" });
+  const found = await prisma.knowledgeEntry.findMany({ where: { projectId, isActive: true, title: { startsWith: title }, NOT: { category: "fact" } }, select: { id: true, title: true } });
+  if (found.length !== 1) return NextResponse.json({ ok: false, error: found.length ? "Заголовку відповідає кілька правил, уточніть" : "Правило не знайдено" });
+  await prisma.knowledgeEntry.update({ where: { id: found[0].id }, data: { content } });
+  return NextResponse.json({ ok: true, id: found[0].id, title: found[0].title });
 }
 
 // ── Факти з датами (актуально / застаріло) ─────────────────────────────────
