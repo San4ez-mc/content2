@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { KIRA_DEFAULT, composePhotoPrompt, pickRefs, avatarBrief, type RefPhoto } from "./avatar";
+import { KIRA_DEFAULT, composePhotoPrompt, pickRefs, avatarBrief, mentionsPhone, PHONE_RULE, type RefPhoto } from "./avatar";
 
 const photo = (id: string, ...tags: string[]): RefPhoto => ({ id, url: `https://x/${id}.jpg`, tags: ["ref", ...tags] });
 
@@ -37,5 +37,13 @@ describe("avatar", () => {
     expect(b).toContain("ГОЛОС І ХАРАКТЕР");
     expect(b).toContain("ПРАВИЛА ВІДЕО");
     expect(b.length).toBeLessThan(12000);
+  });
+
+  it("правило телефона додається лише коли в сцені є телефон", () => {
+    expect(composePhotoPrompt(KIRA_DEFAULT, { scene: "she looks at her smartphone screen, smiling" })).toContain(PHONE_RULE);
+    expect(composePhotoPrompt(KIRA_DEFAULT, { scene: "laughing in a park with a coffee" })).not.toContain("PHONE RULE");
+    expect(mentionsPhone("свайпає по екрану телефона")).toBe(true);
+    expect(KIRA_DEFAULT.photoRules).toContain("Телефон:");
+    expect(KIRA_DEFAULT.videoRules).toContain("Телефон у відео");
   });
 });

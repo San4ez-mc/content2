@@ -77,6 +77,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, updated: n, days: perDay.size, minPerDay: counts.length ? Math.min(...counts) : 0, maxPerDay: counts.length ? Math.max(...counts) : 0 });
   }
 
+  // Перенести один пост на дату/час: { action:"schedule_post", projectId, number, date? ("YYYY-MM-DD"), time ("HH:MM", київський) }
+  if (action === "schedule_post") {
+    const b = body as any;
+    const projectId = String(b.projectId || "");
+    const number = Number(b.number);
+    const time = String(b.time || "");
+    if (!projectId || !Number.isFinite(number) || !/^\d{1,2}:\d{2}$/.test(time)) return NextResponse.json({ ok: false, error: "projectId, number, time (HH:MM) обовʼязкові" }, { status: 400 });
+    const g = await prisma.postGroup.findFirst({ where: { projectId, number }, select: { id: true } });
+    if (!g) return NextResponse.json({ ok: false, error: "Пост не знайдено" }, { status: 404 });
+    await prisma.postGroup.update({ where: { id: g.id }, data: { scheduleTime: time, ...(b.date ? { postDate: new Date(String(b.date)) } : {}) } });
+    return NextResponse.json({ ok: true, number, time, date: b.date || null });
+  }
+
   // Прикріпити готове медіа зі Сховища до поста: { action:"attach_media", projectId, number, imagePath ("/uploads/media/…" або mp4/png), mediaType? }
   // (пост лишається у своїй мережі й даті; публікатор бере imagePath як фото/відео)
   if (action === "attach_media") {
