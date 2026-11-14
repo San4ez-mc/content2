@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAvatar, avatarContext } from "@/lib/avatarDb";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
@@ -67,6 +68,7 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "send_media": return await sendMedia(projectId, params, telegramChatId, telegramBotToken);
       case "list_media": return await listMedia(projectId, params);
       case "get_rules": return await getRules(projectId, params);
+      case "get_avatar": return await getAvatarTool(projectId, params);
       case "get_writing_core": return await getWritingCore();
       case "check_writing": return await checkWriting(params);
       case "query_vector": return await queryVector(projectId, params);
@@ -480,10 +482,25 @@ async function getRules(projectId: string, params: Record<string, unknown>) {
     },
     orderBy: [{ category: "asc" }, { createdAt: "asc" }],
   });
-  const rules = entries.map((e) => `### ${e.title}\n${e.content}`).join("\n\n");
+  let rules = entries.map((e) => `### ${e.title}\n${e.content}`).join("\n\n");
+  // Якщо в компанії є аватар (обличчя бренду), пости пишуться від його імені: стисла картка (хто, голос) додається до правил.
+  // Повні правила фото й відео віддає окремо get_avatar. Не додається, коли просять конкретну category.
+  if (!category) {
+    const av = await getAvatar(projectId);
+    if (av && av.isActive) {
+      rules += `${rules ? "\n\n" : ""}### Аватар: ${av.name} (пости пишемо від її імені)\n${String(av.bio || "").slice(0, 700)}\n${String(av.voiceRules || "").slice(0, 2400)}`;
+    }
+  }
   // withFacts=1 — додатково віддати блок АКТУАЛЬНІ ФАКТИ (для окремих воронок, що читають лише get_rules)
   const facts = params.withFacts ? (await listFactsCore(projectId, "active")).text : undefined;
   return NextResponse.json({ ok: true, count: entries.length, rules, ...(facts !== undefined ? { facts } : {}) });
+}
+
+// Аватар: повний бриф (голос, зовнішність, правила фото й відео) + референси. Для Content Manager і воронок.
+async function getAvatarTool(projectId: string, params: Record<string, unknown>) {
+  const ctx = await avatarContext(projectId, { shot: params.shot ? String(params.shot) : undefined });
+  if (!ctx) return NextResponse.json({ ok: true, exists: false, text: "" });
+  return NextResponse.json({ ok: true, exists: true, text: ctx.brief, name: ctx.avatar.name, tagline: ctx.avatar.tagline, refs: ctx.refs });
 }
 
 const short = (v: any, n = 160) => { const s = String(v || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };

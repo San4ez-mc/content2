@@ -45,6 +45,7 @@ model Project {
   formats          Format[]
   personas         Persona[]
   founderProfile   FounderProfile?
+  avatar           Avatar?
   postGroups       PostGroup[]
   chatSessions     ChatSession[]
   notifications    Notification[]
@@ -159,6 +160,31 @@ model FounderProfile {
   project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("founder_profiles")
+}
+
+// ─── Аватар (обличчя бренду) ───────────────────────────────────
+// Вигаданий персонаж, що веде соцмережі від свого імені: зовнішність-якір, правила нових фото й відео, голос.
+// Фото-референси лежать у Сховищі (MediaItem folder="avatar"), тут лише їхній порядок (перше = основне).
+// Воронки генерації фото/відео беруть усе звідси (/api/webhooks/avatar-context). 1:1 до проєкту.
+model Avatar {
+  id          String   @id @default(cuid())
+  projectId   String   @unique @map("project_id")
+  name        String
+  tagline     String?
+  bio         String?  @db.Text // хто вона, коротка історія
+  look        String?  @db.Text // якір зовнішності: що не змінюється ніколи
+  basePrompt  String?  @map("base_prompt") @db.Text // EN-опис для генераторів зображень
+  photoRules  String?  @map("photo_rules") @db.Text // що можна/не можна змінювати в нових фото, формула промпта
+  videoRules  String?  @map("video_rules") @db.Text // правила відео (довжина клипа, рух, чого не робимо)
+  voiceRules  String?  @map("voice_rules") @db.Text // як пише й говорить
+  disclosure  String?  @db.Text // позначка «створено ШІ» для біо й публікацій
+  refPhotoIds Json     @default("[]") @map("ref_photo_ids") // id MediaItem-референсів, перше = основне
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("avatars")
 }
 
 model PostGroup {

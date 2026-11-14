@@ -12,6 +12,7 @@ const NAV = [
   { href: "/", label: "Контент" },
   { href: "/products", label: "Продукти" },
   { href: "/personas", label: "Персони" },
+  { href: "/avatar", label: "Аватар" },
   { href: "/lead-magnets", label: "Лід-магніти" },
   { href: "/topics", label: "Теми" },
   { href: "/facts", label: "Актуальне" },
