@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAvatar, avatarContext, withAvatarParams } from "@/lib/avatarDb";
+import { upcomingKiroEvents, eventsText, isKiroEventCard } from "@/lib/kiroEvents";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
@@ -69,6 +70,8 @@ async function handle(req: NextRequest, params: Record<string, unknown>) {
       case "list_media": return await listMedia(projectId, params);
       case "get_rules": return await getRules(projectId, params);
       case "get_avatar": return await getAvatarTool(projectId, params);
+      case "get_events": return await getEventsTool(projectId, params);
+      case "update_network_rules": return await updateNetworkRules(projectId, params);
       case "get_writing_core": return await getWritingCore();
       case "check_writing": return await checkWriting(params);
       case "query_vector": return await queryVector(projectId, params);
@@ -314,6 +317,8 @@ async function createPost(projectId: string, params: Record<string, unknown>, te
           funnelSlug: funnelSlug || "text_only",
           funnelParams,
           generationStatus: needsGeneration ? "pending" : "done",
+          // готова картинка/відео зі Сховища або картка події KIRO (для сторіз-анонсів): без генерації
+          ...(!needsGeneration && typeof params.image_path === "string" && (params.image_path.startsWith("/uploads/") || isKiroEventCard(params.image_path)) ? { imagePath: params.image_path, imageType: isKiroEventCard(params.image_path) ? "event_card" : "storage" } : {}),
         }],
       },
     },
@@ -495,6 +500,32 @@ async function getRules(projectId: string, params: Record<string, unknown>) {
   // withFacts=1 — додатково віддати блок АКТУАЛЬНІ ФАКТИ (для окремих воронок, що читають лише get_rules)
   const facts = params.withFacts ? (await listFactsCore(projectId, "active")).text : undefined;
   return NextResponse.json({ ok: true, count: entries.length, rules, ...(facts !== undefined ? { facts } : {}) });
+}
+
+// Події з додатку для анонсів і сторіз (лише для компанії KIRO). params: days (1-30, за замовчуванням 7), city, limit.
+async function getEventsTool(projectId: string, params: Record<string, unknown>) {
+  const proj = await prisma.project.findUnique({ where: { id: projectId }, select: { name: true } });
+  if (!proj || !/kiro/i.test(proj.name)) return NextResponse.json({ ok: true, count: 0, text: "", events: [], note: "Для цієї компанії немає джерела подій" });
+  try {
+    const items = await upcomingKiroEvents(Number(params.days) || 7, params.city ? String(params.city) : undefined, Math.min(Number(params.limit) || 40, 80));
+    return NextResponse.json({ ok: true, count: items.length, text: eventsText(items), events: items });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: "Афіша KIRO недоступна: " + e.message });
+  }
+}
+
+// Правила мережі (текст у SocialNetwork.rules): { platform, text, mode?: "replace"|"append" }
+async function updateNetworkRules(projectId: string, params: Record<string, unknown>) {
+  const text = String(params.text || "").trim();
+  if (!text) return NextResponse.json({ ok: false, error: "text обовʼязковий" });
+  const networks = await prisma.socialNetwork.findMany({ where: { projectId } });
+  const net = pickNetwork(networks, params.platform);
+  if (!net) return NextResponse.json({ ok: false, error: "Мережу не знайдено" });
+  const next = params.mode === "append" && net.rules ? `${net.rules}
+
+${text}` : text;
+  await prisma.socialNetwork.update({ where: { id: net.id }, data: { rules: next } });
+  return NextResponse.json({ ok: true, platform: net.platformKey, chars: next.length });
 }
 
 // Аватар: повний бриф (голос, зовнішність, правила фото й відео) + референси. Для Content Manager і воронок.

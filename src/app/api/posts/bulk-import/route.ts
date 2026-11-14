@@ -2,6 +2,7 @@ import { pickNetwork } from "@/lib/platformKeys";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withAvatarParams } from "@/lib/avatarDb";
+import { isKiroEventCard } from "@/lib/kiroEvents";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
@@ -219,6 +220,8 @@ export async function POST(req: NextRequest) {
       funnelSlug: derivedFunnelSlug,
       funnelParams: funnelParams as any,
       generationStatus: (needsGeneration ? "pending" : "done") as "pending" | "done",
+      // готова картинка зі Сховища або картка події KIRO (сторіз-анонси): без генерації
+      ...(!needsGeneration && typeof p.image_path === "string" && (p.image_path.startsWith("/uploads/") || isKiroEventCard(p.image_path)) ? { imagePath: p.image_path, imageType: isKiroEventCard(p.image_path) ? "event_card" : "storage" } : {}),
     };
 
     // Try to claim a placeholder created at generation start (same slot).

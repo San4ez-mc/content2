@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isKiroEventCard } from "@/lib/kiroEvents";
 
 // Службовий інструмент порядку в проєктах (компаніях) для Flows/адміністратора: переглянути обсяг даних у кожному
 // й архівувати (isActive=false: проєкт зникає з перемикача, дані лишаються, `unarchive` повертає).
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
     const projectId = String(b.projectId || "");
     const number = Number(b.number);
     const imagePath = String(b.imagePath || "");
-    const okPath = imagePath.startsWith("/uploads/") || imagePath.startsWith("https://kiro.fineko.space/api/v1/events/"); // свій файл або готова картка події KIRO
+    const okPath = imagePath.startsWith("/uploads/") || isKiroEventCard(imagePath); // свій файл або готова картка події KIRO
     if (!projectId || !Number.isFinite(number) || !okPath) return NextResponse.json({ ok: false, error: "projectId, number, imagePath (/uploads/… або картка події KIRO) обовʼязкові" }, { status: 400 });
     const g = await prisma.postGroup.findFirst({ where: { projectId, number }, include: { items: { orderBy: { orderIndex: "asc" }, take: 1 } } });
     if (!g || !g.items[0]) return NextResponse.json({ ok: false, error: "Пост не знайдено" }, { status: 404 });
