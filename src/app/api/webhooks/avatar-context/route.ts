@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/prisma";
-import { avatarContext, AVATAR_FOLDER, AVATAR_GEN_FOLDER, absUrl } from "@/lib/avatarDb";
+import { avatarContext, ensureAvatar, AVATAR_FOLDER, AVATAR_GEN_FOLDER, absUrl } from "@/lib/avatarDb";
 import { composePhotoPrompt } from "@/lib/avatar";
 
 // Аватар для воронок Flows (фото й відео): правила, референси, готовий промпт нового фото; збереження результату в Сховище.
@@ -20,6 +20,13 @@ export async function POST(req: NextRequest) {
   const projectId = String(b.projectId || "");
   if (!projectId) return NextResponse.json({ ok: false, error: "projectId обовʼязковий" }, { status: 400 });
   const action = String(b.action || "context");
+
+  // Службові дії налаштування (скрипти): створити аватара із заготовки і задати порядок референсів
+  if (action === "ensure") {
+    const a = await ensureAvatar(projectId, b.preset);
+    if (Array.isArray(b.refPhotoIds)) await prisma.avatar.update({ where: { projectId }, data: { refPhotoIds: b.refPhotoIds.map(String) } });
+    return NextResponse.json({ ok: true, avatarId: a.id, name: a.name });
+  }
 
   if (action === "context") {
     const ctx = await avatarContext(projectId, { shot: b.shot });
