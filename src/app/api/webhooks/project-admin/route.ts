@@ -76,6 +76,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, updated: n, days: perDay.size, minPerDay: counts.length ? Math.min(...counts) : 0, maxPerDay: counts.length ? Math.max(...counts) : 0 });
   }
 
+  // Прикріпити готове медіа зі Сховища до поста: { action:"attach_media", projectId, number, imagePath ("/uploads/media/…" або mp4/png), mediaType? }
+  // (пост лишається у своїй мережі й даті; публікатор бере imagePath як фото/відео)
+  if (action === "attach_media") {
+    const b = body as any;
+    const projectId = String(b.projectId || "");
+    const number = Number(b.number);
+    const imagePath = String(b.imagePath || "");
+    if (!projectId || !Number.isFinite(number) || !imagePath.startsWith("/uploads/")) return NextResponse.json({ ok: false, error: "projectId, number, imagePath (/uploads/…) обовʼязкові" }, { status: 400 });
+    const g = await prisma.postGroup.findFirst({ where: { projectId, number }, include: { items: { orderBy: { orderIndex: "asc" }, take: 1 } } });
+    if (!g || !g.items[0]) return NextResponse.json({ ok: false, error: "Пост не знайдено" }, { status: 404 });
+    await prisma.postItem.update({ where: { id: g.items[0].id }, data: { imagePath, generationStatus: "done", generationError: null, imageType: "avatar" } });
+    return NextResponse.json({ ok: true, number, imagePath });
+  }
+
   // Резервна копія даних проєктів перед злиттям/видаленням: усе, крім постів і медіафайлів (лише читання).
   if (action === "export") {
     const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
