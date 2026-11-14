@@ -3,7 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import { avatarContext, ensureAvatar, AVATAR_FOLDER, AVATAR_GEN_FOLDER, absUrl } from "@/lib/avatarDb";
-import { composePhotoPrompt } from "@/lib/avatar";
+import { composePhotoPrompt, KIRA_DEFAULT } from "@/lib/avatar";
 
 // Аватар для воронок Flows (фото й відео): правила, референси, готовий промпт нового фото; збереження результату в Сховище.
 // Auth: x-webhook-secret === WEBHOOK_SECRET.
@@ -26,6 +26,15 @@ export async function POST(req: NextRequest) {
     const a = await ensureAvatar(projectId, b.preset);
     if (Array.isArray(b.refPhotoIds)) await prisma.avatar.update({ where: { projectId }, data: { refPhotoIds: b.refPhotoIds.map(String) } });
     return NextResponse.json({ ok: true, avatarId: a.id, name: a.name });
+  }
+
+  // Оновити тексти правил з поточної заготовки (фото й порядок референсів не чіпає): { action:"reset_texts", preset:"kira" }
+  if (action === "reset_texts") {
+    if (b.preset !== "kira") return NextResponse.json({ ok: false, error: "відомий лише preset kira" }, { status: 400 });
+    await ensureAvatar(projectId, "kira");
+    const { name, tagline, bio, look, basePrompt, photoRules, videoRules, voiceRules, disclosure } = KIRA_DEFAULT;
+    await prisma.avatar.update({ where: { projectId }, data: { name, tagline, bio, look, basePrompt, photoRules, videoRules, voiceRules, disclosure } });
+    return NextResponse.json({ ok: true });
   }
 
   if (action === "context") {
