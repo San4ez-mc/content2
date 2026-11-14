@@ -47,3 +47,13 @@ export async function avatarContext(projectId: string, opts: { shot?: string; ma
     scenePhotos: photos.filter((p) => p.folder === AVATAR_FOLDER && !p.tags.includes("ref")).map((p) => ({ id: p.id, url: p.url, tags: p.tags })),
   };
 }
+
+/** Усі відео проєкту з активним аватаром будуються з нього: додаємо прапорець і projectId до замовлення на відео-воронку. */
+export async function withAvatarParams<T extends Record<string, any> | null | undefined>(funnelSlug: string, projectId: string, params: T): Promise<T | (Record<string, any>)> {
+  if (!/short-video/.test(funnelSlug) || (params && params.avatar === false)) return params;
+  try {
+    const a = await getAvatar(projectId);
+    if (a && a.isActive) return { ...(params || {}), avatar: true, projectId };
+  } catch { /* без аватара відео збирається як раніше */ }
+  return params;
+}

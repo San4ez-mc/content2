@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAvatar, avatarContext } from "@/lib/avatarDb";
+import { getAvatar, avatarContext, withAvatarParams } from "@/lib/avatarDb";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { rateLimit } from "@/lib/rateLimit";
@@ -931,6 +931,11 @@ async function fireGeneration(itemId: string, groupId: string, funnelSlug: strin
   if (/short-video/.test(funnelSlug) && !(funnelParams && (funnelParams.logoUrl || funnelParams.logo === false))) {
     const logoUrl = await findProjectLogoUrl(groupId);
     if (logoUrl) funnelParams = { ...(funnelParams || {}), logoUrl };
+  }
+  // Аватар: якщо в компанії є активний аватар, УСІ відео будуються з нього, доки пост явно не просить avatar:false.
+  if (/short-video/.test(funnelSlug)) {
+    const grp = await prisma.postGroup.findUnique({ where: { id: groupId }, select: { projectId: true } }).catch(() => null);
+    if (grp) funnelParams = await withAvatarParams(funnelSlug, grp.projectId, funnelParams);
   }
   const CONTENT2 = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
   const WH_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";

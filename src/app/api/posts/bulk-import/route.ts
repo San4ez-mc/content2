@@ -1,6 +1,7 @@
 import { pickNetwork } from "@/lib/platformKeys";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withAvatarParams } from "@/lib/avatarDb";
 import { broadcastToProject } from "@/lib/sse";
 import { injectTrackedLinks } from "@/lib/leadMagnetLinks";
 import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
@@ -329,7 +330,7 @@ export async function POST(req: NextRequest) {
     let callbackUrl = `${CONTENT2_URL}/api/webhooks/generation-event?token=${WEBHOOK_SECRET}&postItemId=${ins.itemId}`;
     if (deliver) callbackUrl += `&telegramChatId=${encodeURIComponent(deliver.chatId)}&telegramBotToken=${encodeURIComponent(deliver.botToken)}`;
     const webhookUrl = `${FLOWS_BASE}/${ins.funnelSlug}`;
-    const mergedParams: any = { ...(ins.funnelParams || {}) };
+    const mergedParams: any = { ...((await withAvatarParams(ins.funnelSlug, projectId, ins.funnelParams || {})) || {}) };
     if (deliver) mergedParams._deliver = deliver;
     const payload = {
       ...mergedParams,
