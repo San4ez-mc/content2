@@ -391,6 +391,9 @@ function deriveSlugFromMediaType(mediaType: string | undefined): string | null {
     template: "content-image-template",
     broll: "content-video-broll",
     short_video: "content-short-video",
+    video_edit: "video-talking-edit",
+    avatar_photo: "avatar-photo",
+    avatar_story: "avatar-story",
     text_only: "text_only",
   };
   if (!mediaType) return null;

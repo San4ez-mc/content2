@@ -18,6 +18,9 @@ export const MEDIA_TYPES: MediaTypeDef[] = [
   { key: "carousel", label: "Карусель (кілька фото)", funnelSlug: "content-carousel", hasText: true, sources: ["auto", "storage"], extraFields: ["slides", "palette", "aspect"] },
   { key: "video", label: "Відео + текст", funnelSlug: "content-short-video", hasText: true, sources: ["auto", "storage"], extraFields: ["duration", "subtitles", "thumbnail", "music", "aspect"] },
   { key: "file", label: "Файл", funnelSlug: null, hasText: true, sources: ["storage"], extraFields: ["file"] },
+  { key: "video_edit", label: "Відео: монтаж сирого", funnelSlug: "video-talking-edit", hasText: true, sources: ["storage"], extraFields: ["videoUrl", "speaker", "cta", "targetSec", "purpose"] },
+  { key: "avatar_photo", label: "Фото аватара", funnelSlug: "avatar-photo", hasText: true, sources: ["auto"], extraFields: ["scene", "shot", "aspect", "topic", "outfit"] },
+  { key: "avatar_story", label: "Сторіз аватара", funnelSlug: "avatar-story", hasText: false, sources: ["auto"], extraFields: ["scene", "title", "subtitle", "shot", "topic"] },
   { key: "image_music", label: "Фото під музику", funnelSlug: "content-carousel", hasText: false, sources: ["auto", "storage"], extraFields: ["music", "aspect", "duration"] },
 ];
 

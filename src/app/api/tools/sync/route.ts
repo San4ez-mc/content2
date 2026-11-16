@@ -94,6 +94,44 @@ const TOOL_DESCRIPTIONS: Record<string, ToolDesc> = {
       { key: "coverTitle", label: "Заголовок обкладинки", type: "text", required: false },
     ],
   },
+  "video-talking-edit": {
+    aiDescription:
+      "МОНТАЖ РОЗМОВНОГО ВІДЕО зі сирого файлу (спікер дивиться в камеру). Розпізнає мовлення, ШІ-редактор вирізає тишу на початку й у кінці, паузи, вдихи, слова-паразити й зайві речення, кадрує під 9:16, додає зуми, субтитри з підсвіткою слова, заголовок-хук, плашку спікера, іконки-картинки, звуки, музику, заклик (CTA) і прогрес-бар. Для рекламних креативів і Reels/TikTok/Shorts. Джерело: funnel_params.videoUrl (https-посилання або файл у Сховищі на сервері). Результат: MP4 1080x1920 у календарі за 3-6 хв.",
+    exampleOutput: "MP4 9:16, 30-55 с: чисте мовлення без пауз, субтитри, хук зверху, плашка з іменем спікера, 2-3 іконки, музика під голосом, CTA в кінці.",
+    paramsSchema: [
+      { key: "videoUrl", label: "Сире відео (https або файл на сервері)", type: "text", required: true },
+      { key: "speaker", label: "Спікер ({name, role})", type: "json", required: false },
+      { key: "cta", label: "Заклик у кінці ({text, sub})", type: "json", required: false },
+      { key: "targetSec", label: "Цільова тривалість, с (15-75)", type: "number", required: false },
+      { key: "purpose", label: "Мета", type: "select", options: ["ad", "reel"], required: false },
+      { key: "topic", label: "Контекст для ШІ-редактора", type: "text", required: false },
+    ],
+  },
+  "avatar-photo": {
+    aiDescription:
+      "НОВЕ ФОТО АВАТАРА (персонаж бренду, напр. Кіра): бере референси й правила компанії зі сторінки «Аватар», малює нове фото в заданій сцені (місце, поза, світло, інші люди на фоні) і привʼязує до поста. Для Instagram-фото й постів з обличчям бренду. Підпис до фото обовʼязковий і пишеться окремо в content.",
+    exampleOutput: "PNG 4:5 (або 9:16, 1:1): аватар у сцені з опису, одяг і риси обличчя за правилами аватара.",
+    paramsSchema: [
+      { key: "scene", label: "Сцена англійською (де, що робить, світло)", type: "text", required: true },
+      { key: "shot", label: "Кадр", type: "select", options: ["portrait", "laugh", "pull_flyer", "profile", "fullbody", "surprise", "smile", "skeptic"], required: false },
+      { key: "aspect", label: "Формат", type: "select", options: ["4:5", "9:16", "1:1"], required: false },
+      { key: "topic", label: "Рубрика (колір стрічки флаєра)", type: "select", options: ["concert", "party", "day", "culture", "sport", "free"], required: false },
+      { key: "outfit", label: "Інший одяг (англійською)", type: "text", required: false },
+      { key: "count", label: "Скільки варіантів (1-4)", type: "number", required: false },
+    ],
+  },
+  "avatar-story": {
+    aiDescription:
+      "СТОРІЗ З АВАТАРОМ: нове фото аватара 9:16 у сцені + текст-заголовок поверх (шаблон, що не закриває обличчя). Для щоденних сторіз Instagram. Анонси реальних подій робляться без цієї воронки: готова картка події береться з get_events (image_path).",
+    exampleOutput: "PNG 9:16: аватар у сцені, великий заголовок і підзаголовок знизу.",
+    paramsSchema: [
+      { key: "scene", label: "Сцена англійською", type: "text", required: true },
+      { key: "title", label: "Заголовок українською (3-7 слів)", type: "text", required: true },
+      { key: "subtitle", label: "Підзаголовок українською", type: "text", required: false },
+      { key: "shot", label: "Кадр", type: "select", options: ["portrait", "laugh", "pull_flyer", "profile", "fullbody", "surprise", "smile", "skeptic"], required: false },
+      { key: "topic", label: "Рубрика", type: "select", options: ["concert", "party", "day", "culture", "sport", "free"], required: false },
+    ],
+  },
   "content-video-broll": {
     aiDescription:
       "Генерує AI B-roll відео через Kling. Підходить для: Reels, TikTok, коли потрібне коротке відео замість статичного зображення.",
@@ -105,14 +143,17 @@ const TOOL_DESCRIPTIONS: Record<string, ToolDesc> = {
   },
 };
 
-export async function POST() {
+export async function POST(req: Request) {
+  // Синхронізація вручну з адмінки (сесія) або зі скриптів Flows після додавання воронки (секрет вебхуків)
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const bySecret = !!process.env.WEBHOOK_SECRET && req.headers.get("x-webhook-secret") === process.env.WEBHOOK_SECRET;
+  if (!session && !bySecret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const synced: string[] = [];
 
   for (const [slug, desc] of Object.entries(TOOL_DESCRIPTIONS)) {
-    const name = slug
+    const NAMES: Record<string, string> = { "video-talking-edit": "Монтаж розмовного відео", "avatar-photo": "Фото аватара", "avatar-story": "Сторіз аватара" };
+    const name = NAMES[slug] || slug
       .replace("content-", "")
       .split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
