@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncContentTools } from "@/lib/toolsSync";
 import { isKiroEventCard } from "@/lib/kiroEvents";
 
 // Службовий інструмент порядку в проєктах (компаніях) для Flows/адміністратора: переглянути обсяг даних у кожному
@@ -75,6 +76,11 @@ export async function POST(req: NextRequest) {
     }
     const counts = Array.from(perDay.values());
     return NextResponse.json({ ok: true, updated: n, days: perDay.size, minPerDay: counts.length ? Math.min(...counts) : 0, maxPerDay: counts.length ? Math.max(...counts) : 0 });
+  }
+
+  // Оновити список воронок-інструментів Content Manager з опису в коді: { action:"sync_tools" }
+  if (action === "sync_tools") {
+    return NextResponse.json({ ok: true, synced: await syncContentTools() });
   }
 
   // Перенести один пост на дату/час: { action:"schedule_post", projectId, number, date? ("YYYY-MM-DD"), time ("HH:MM", київський) }
