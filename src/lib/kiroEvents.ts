@@ -26,7 +26,7 @@ export function mapKiroEvent(e: any): KiroEvent {
     city: e.city?.nameUk || "", place, priceText: free ? "безкоштовно" : e.price ? `від ${Math.round(Number(e.price))} грн` : "ціну уточнюйте",
     category: e.category?.nameUk || "", slug: e.slug,
     link: `${KIRO_SITE}/events/${e.slug}?utm_source=instagram&utm_medium=story`,
-    storyImage: `${CARD_PREFIX}${e.id}/share-image?variant=1`,
+    storyImage: `${CARD_PREFIX}${e.id}/share-image?variant=2`,
   };
 }
 

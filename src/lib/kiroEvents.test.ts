@@ -13,7 +13,7 @@ describe("kiroEvents", () => {
     expect(e.time).toBe("18:30");
     expect(e.priceText).toBe("від 390 грн");
     expect(e.link).toBe("https://kiro.fineko.space/events/izdryk-abc?utm_source=instagram&utm_medium=story");
-    expect(e.storyImage).toBe("https://kiro.fineko.space/api/v1/events/e1/share-image?variant=1");
+    expect(e.storyImage).toBe("https://kiro.fineko.space/api/v1/events/e1/share-image?variant=2");
     expect(e.place).toBe("Будинок кіно, вул. Саксаганського");
   });
 
@@ -22,7 +22,7 @@ describe("kiroEvents", () => {
   });
 
   it("лише картка події KIRO дозволена як зовнішня картинка", () => {
-    expect(isKiroEventCard("https://kiro.fineko.space/api/v1/events/e1/share-image?variant=1")).toBe(true);
+    expect(isKiroEventCard("https://kiro.fineko.space/api/v1/events/e1/share-image?variant=2")).toBe(true);
     expect(isKiroEventCard("https://evil.example/api/v1/events/e1/share-image")).toBe(false);
     expect(isKiroEventCard("/uploads/media/x.png")).toBe(false);
   });
