@@ -68,6 +68,16 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const sseRef = useRef<EventSource | null>(null);
 
+  // Після перемикання компанії компонент не перемонтовується (той самий маршрут): фільтр за мережею, відкритий пост і вибране
+  // лишались від ПОПЕРЕДНЬОЇ компанії, і календар виглядав порожнім або «не перемкнутим». Скидаємо.
+  useEffect(() => {
+    setActiveNetwork(null);
+    setSelectedPost(null);
+    setQuickCreateDate(null);
+    setBulkSelected(new Set());
+    setSearch("");
+  }, [activeProject.id]);
+
   async function handleDropOnDate(postId: string, targetDate: string) {
     await fetch(`/api/posts/${postId}`, {
       method: "PATCH",

@@ -39,12 +39,27 @@ export function Topbar({ user, projects, activeProject }: Props) {
     if (!projectId || projectId === activeProject?.id) return;
     setSwitching(true);
     try {
-      await fetch("/api/active-project", {
+      const res = await fetch("/api/active-project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId }),
       });
+      // Раніше відповідь не перевірялась: прострочена сесія (401), немає доступу (403) чи збій мережі = мовчки «не перемкнулось».
+      if (!res.ok) {
+        alert(res.status === 401 ? "Сесія завершилась. Увійдіть знову, тоді перемикайте компанію." : res.status === 403 ? "Немає доступу до цієї компанії." : "Не вдалося перемкнути компанію (помилка " + res.status + "). Спробуйте ще раз.");
+        return;
+      }
+      // Сторінки дашборду віддають пріоритет ?projectId= з адреси над кукою (deep-лінки), а шапка бере лише куку.
+      // Якщо в адресі лишився старий ?projectId=, сторінка далі показувала б стару компанію, хоч шапка вже нова. Прибираємо параметр.
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.has("projectId")) {
+        qs.delete("projectId");
+        const rest = qs.toString();
+        router.replace(pathname + (rest ? "?" + rest : ""));
+      }
       router.refresh();
+    } catch {
+      alert("Не вдалося перемкнути компанію: немає зв'язку з сервером. Спробуйте ще раз.");
     } finally {
       setSwitching(false);
     }
