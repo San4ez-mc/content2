@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
         const data: any = {};
         if (typeof x.sendToTelegram === "boolean") data.sendToTelegram = x.sendToTelegram;
         if (typeof x.postDirectly === "boolean") data.postDirectly = x.postDirectly;
+        if (typeof x.autopostSlug === "string") data.autopostSlug = x.autopostSlug.trim() || null; // воронка-публікатор мережі (slug у Flows)
         if (!Object.keys(data).length) continue;
         const r = await prisma.socialNetwork.updateMany({ where: { projectId, platformKey: String(x.platformKey) }, data });
         changed.push({ platformKey: x.platformKey, ...data, rows: r.count });

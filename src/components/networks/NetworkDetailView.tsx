@@ -64,7 +64,11 @@ export function NetworkDetailView({ network, formats: initialFormats }: { networ
   const [formats, setFormats] = useState<Format[]>(initialFormats);
   const [sendToTelegram, setSendToTelegram] = useState(network.sendToTelegram);
   const [postDirectly, setPostDirectly] = useState(network.postDirectly);
-  const [autopostSlug, setAutopostSlug] = useState(network.autopostSlug || `publish-${network.platformKey}`);
+  // Показуємо РЕАЛЬНО збережений slug (раніше підставлялося publish-<мережа>, ніби воно збережене: поле виглядало заповненим, а в базі було порожньо,
+  // і автопублікація мовчки не працювала). Значення за замовчуванням лише як підказка (placeholder) або явна дія «Підставити».
+  const defaultSlug = `publish-${network.platformKey}`;
+  const [autopostSlug, setAutopostSlug] = useState(network.autopostSlug || "");
+  const [savedSlug, setSavedSlug] = useState(network.autopostSlug || "");
   const autopostBotId = FLOWS_AUTOPOST_BOTS[network.platformKey];
 
   async function saveNetwork(patch: Record<string, any>) {
@@ -153,7 +157,7 @@ export function NetworkDetailView({ network, formats: initialFormats }: { networ
             <input
               type="checkbox"
               checked={postDirectly}
-              onChange={(e) => { setPostDirectly(e.target.checked); saveNetwork({ postDirectly: e.target.checked, autopostSlug: autopostSlug || null }); }}
+              onChange={(e) => { setPostDirectly(e.target.checked); saveNetwork({ postDirectly: e.target.checked, autopostSlug: autopostSlug || null }); setSavedSlug(autopostSlug || ""); }}
             />
             Постити в соц.мережу автоматично
           </label>
@@ -167,10 +171,20 @@ export function NetworkDetailView({ network, formats: initialFormats }: { networ
                   className="input text-xs max-w-xs"
                   value={autopostSlug}
                   onChange={(e) => setAutopostSlug(e.target.value)}
-                  onBlur={() => saveNetwork({ autopostSlug: autopostSlug || null })}
-                  placeholder={`publish-${network.platformKey}`}
+                  onBlur={() => { const v = autopostSlug.trim(); setAutopostSlug(v); saveNetwork({ autopostSlug: v || null }); setSavedSlug(v); }}
+                  placeholder={defaultSlug}
                 />
-                <Hint text="Назва (slug) воронки-публікатора в Flows, яку викликати. За замовчуванням publish-<platformKey>." />
+                <Hint text={`Назва (slug) воронки-публікатора в Flows, яку викликати. Типова: ${defaultSlug}. Для другого акаунта тієї ж мережі (інший проєкт) вкажіть його власну воронку, наприклад ${defaultSlug}-назва.`} />
+                {!savedSlug ? (
+                  <div className="mt-1.5 text-[11px] text-danger leading-snug">
+                    ⚠️ Slug не збережений: автопублікація НЕ працює, пости не підуть.{" "}
+                    <button type="button" className="underline" onClick={() => { setAutopostSlug(defaultSlug); saveNetwork({ autopostSlug: defaultSlug }); setSavedSlug(defaultSlug); }}>
+                      Підставити {defaultSlug}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1.5 text-[11px] text-success">✓ Збережено: {savedSlug}</div>
+                )}
               </div>
               <a
                 href={autopostBotId ? `https://flows.fineko.space/funnel/${autopostBotId}` : "https://flows.fineko.space/funnels"}
@@ -178,7 +192,7 @@ export function NetworkDetailView({ network, formats: initialFormats }: { networ
                 rel="noreferrer"
                 className="inline-block text-xs text-accent hover:underline"
               >
-                🔑 Відкрити ключі воронки «{autopostSlug}» у Flows →
+                🔑 Відкрити ключі воронки «{autopostSlug || defaultSlug}» у Flows →
               </a>
               <Hint text="Там треба вставити токени доступу до самої соцмережі (напр. THREADS_USER_ID / THREADS_ACCESS_TOKEN) — окремо для кожної мережі, за інструкцією платформи." />
             </div>
