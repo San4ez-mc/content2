@@ -6,7 +6,7 @@ export const maxDuration = 60;
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 
 async function sendTgText(botToken: string, chatId: string, text: string) {
   try {

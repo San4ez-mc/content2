@@ -5,7 +5,7 @@ import { newCreatorRequest, getCreatorEntry } from "@/lib/tiktokCreator";
 
 type Ctx = { params: { id: string } };
 
-const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
+import { SCHEDULER_TOKEN } from "@/lib/secrets";
 const TIKTOK_FLOWS_URL = "https://flows.fineko.space/webhook/bot/publish-tiktok";
 
 async function loadTiktokPost(id: string) {

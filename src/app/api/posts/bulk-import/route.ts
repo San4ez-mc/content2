@@ -9,7 +9,7 @@ import { normalizeFormat, formatToPostGroupType } from "@/lib/formatKeys";
 import { scanWriting, lengthViolation } from "@/lib/writingGate";
 import { scanAd, formatAdContent, AD_PLATFORM_KEY } from "@/lib/adRules";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
 const CONTENT2_URL = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
 

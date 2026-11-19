@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 
-const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
+import { SCHEDULER_TOKEN } from "@/lib/secrets";
 
 // Результат прямої публікації: його викликають воронки publish-* (Threads/TikTok/YouTube…) і
 // content-scheduler. Раніше цього роуту не існувало (scheduler передавав callbackUrl у нікуди), тож

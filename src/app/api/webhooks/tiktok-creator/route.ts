@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setCreatorResult } from "@/lib/tiktokCreator";
 
-const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
+import { SCHEDULER_TOKEN } from "@/lib/secrets";
 
 // Callback воронки publish-tiktok (action=creator_info): результат запиту creator_info до TikTok.
 //   POST ?token=…  body: { requestId, ok, creator?: {...}, error? }

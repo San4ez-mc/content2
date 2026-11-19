@@ -83,9 +83,9 @@ pm2 save
 ```bash
 # Add to crontab -e
 # Every day at 09:03, 12:03, 18:03 Kyiv (UTC+3 = UTC+0:00, 06:03, 09:03, 15:03)
-3 6 * * * curl -s -X POST https://content2.fineko.space/api/scheduler/run -H "x-scheduler-token: fnk_scheduler_2026"
-3 9 * * * curl -s -X POST https://content2.fineko.space/api/scheduler/run -H "x-scheduler-token: fnk_scheduler_2026"
-3 15 * * * curl -s -X POST https://content2.fineko.space/api/scheduler/run -H "x-scheduler-token: fnk_scheduler_2026"
+3 6 * * * curl -s -X POST https://content2.fineko.space/api/scheduler/run -H "x-scheduler-token: $SCHEDULER_TOKEN"
+3 9 * * * curl -s -X POST https://content2.fineko.space/api/scheduler/run -H "x-scheduler-token: $SCHEDULER_TOKEN"
+3 15 * * * curl -s -X POST https://content2.fineko.space/api/scheduler/run -H "x-scheduler-token: $SCHEDULER_TOKEN"
 ```
 
 ## Webhook endpoints (for Flows)
@@ -97,4 +97,4 @@ pm2 save
 | `/api/webhooks/notify` | POST | General notification |
 | `/api/scheduler/run` | POST | Trigger scheduled sending |
 
-Auth: `x-webhook-token: fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw`
+Auth: `x-webhook-token: $WEBHOOK_SECRET`

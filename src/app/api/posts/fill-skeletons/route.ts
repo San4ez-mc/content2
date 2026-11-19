@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 // (≤ days), і просить контент-бота написати повний текст кожному через edit_post.
 // edit_post «випускає» скелет у графік. Викликається кроном. Auth: ?token=WEBHOOK_SECRET.
 const FLOWS_WEBHOOK = "https://flows.fineko.space/webhook/bot/content-manager-web";
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 
 async function handle(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");

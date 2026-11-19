@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastToProject } from "@/lib/sse";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("x-webhook-token") || req.nextUrl.searchParams.get("token");

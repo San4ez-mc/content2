@@ -18,7 +18,7 @@ import { seedDefaultStructures } from "@/lib/seedStructures";
 // Дорогі дії (коштують гроші / зовнішні виклики) — суворіший ліміт.
 const EXPENSIVE_ACTIONS = new Set(["create_post", "regenerate_image", "send_media", "create_avatar_reel"]);
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 const FLOWS_BASE = process.env.FLOWS_WEBHOOK_BASE || "https://flows.fineko.space/webhook/bot";
 const CONTENT2_URL = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
 
@@ -995,7 +995,7 @@ async function fireGeneration(itemId: string, groupId: string, funnelSlug: strin
     if (grp) funnelParams = await withAvatarParams(funnelSlug, grp.projectId, funnelParams);
   }
   const CONTENT2 = process.env.NEXTAUTH_URL || "https://content2.fineko.space";
-  const WH_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+  const WH_SECRET = WEBHOOK_SECRET;
   // ФІКС (2026-09-01): attempt раніше НІКОЛИ не передавався → завжди дефолтився на 1 у
   // вебхуку. Ідемпотентність там ключується на (postItemId, attempt) — тож щойно перший
   // колбек для якогось posItemId хоч раз доходив (навіть невдалий), КОЖЕН наступний

@@ -6,7 +6,7 @@ import { broadcastToProject } from "@/lib/sse";
 
 type Ctx = { params: { id: string } };
 
-const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
+import { SCHEDULER_TOKEN } from "@/lib/secrets";
 const TG_FLOWS_URL = "https://flows.fineko.space/webhook/bot/content-scheduler";
 
 // Воронки-публікатори за замовчуванням (якщо в мережі не задано autopostSlug).

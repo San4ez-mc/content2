@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { kyivOffsetMinutes } from "@/lib/utils";
 
-const SCHEDULER_TOKEN = process.env.SCHEDULER_TOKEN || "fnk_scheduler_2026";
+import { SCHEDULER_TOKEN } from "@/lib/secrets";
 const TG_FLOWS_URL = "https://flows.fineko.space/webhook/bot/content-scheduler";
 
 export async function POST(req: NextRequest) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireProjectAccess, isGateError } from "@/lib/tenant";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 const FLOWS_API = process.env.FLOWS_API_BASE || "https://flows.fineko.space";
 
 // Proxies flows deep-link click stats to the dashboard (keeps the shared secret server-side).

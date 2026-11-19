@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { kyivOffsetMinutes } from "@/lib/utils";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 const HORIZON_DAYS = 3; // скільки найближчих днів мають бути закриті постами
 
 // Сторожок календаря: для кожної мережі з автопублікацією (post_directly) перевіряє, що на найближчі HORIZON_DAYS днів

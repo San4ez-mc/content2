@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "fnk_wh_2026_x9mK4pLqR7vNsT1eYcJdBuAw";
+import { WEBHOOK_SECRET } from "@/lib/secrets";
 const FLOWS_API = process.env.FLOWS_API_BASE || "https://flows.fineko.space";
 
 // Swaps any lead-magnet BASE deep-link found in `content` for a unique tracked
