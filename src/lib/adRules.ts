@@ -55,6 +55,11 @@ const JARGON: { re: RegExp; name: string }[] = [
   { re: new RegExp(String.raw`контент-план`, "iu"), name: "контент-план" },
 ];
 
+/** Слова-абстракції, які самі по собі нічого не показують. */
+const ABSTRACT_RE = new RegExp(L0 + "(?:рутин\\p{L}*|хаос\\p{L}*|бардак\\p{L}*|неефективн\\p{L}*|процес(?:и|ів|ах)?|автоматизац\\p{L}*)" + L1, "iu");
+/** Плашка «для кого» без жодної конкретики. */
+const GENERIC_AUDIENCE_RE = new RegExp("^\\s*для\\s+(?:власників|керівників|підприємців|бізнесу)(?:\\s+(?:і|та)\\s+(?:власників|керівників|підприємців))?(?:\\s+бізнесу)?\\s*$", "iu");
+
 /** Заборонені Meta обіцянки й тиск на особисті ознаки. */
 const POLICY: { re: RegExp; why: string }[] = [
   { re: new RegExp(String.raw`гаранту[єю]м|гарантований результат|гарантія результату|без ризику`, "iu"), why: "гарантія результату (Meta вважає оманливою обіцянкою)" },
@@ -129,6 +134,11 @@ export function scanAd(ad: Partial<AdCreative>, opts: { requireLink?: boolean } 
   const totalWords = words(au) + words(ot) + words(ac) + words(os) + pts.reduce((n, x) => n + words(x), 0);
   if (totalWords > AD_LIMITS.overlayTotalWords) add("overlay_total", `усього тексту на картинці ${totalWords} слів (макс ${AD_LIMITS.overlayTotalWords})`);
   if (ad.aspect && !AD_ASPECTS[ad.aspect]) add("bad_aspect", `формат «${ad.aspect}» не підтримується (4:5, 1:1, 9:16)`);
+
+  // «Зачіпає?»: заголовок на картинці з абстракцією без числа не показує жодної сцени («рутина», «хаос», «процеси»).
+  // Креатив має називати конкретний момент або цифру, яку власник упізнає.
+  if (ot && ABSTRACT_RE.test(ot) && !/\d/.test([ot, ac].join(" "))) add("weak_hook", "заголовок на картинці абстрактний (рутина/хаос/процеси) без числа: покажи конкретний момент або цифру");
+  if (au && GENERIC_AUDIENCE_RE.test(au)) add("weak_audience", "плашка «для кого» надто загальна: назви конкретну ситуацію чи розмір команди («Для команд від 7 людей»)");
 
   const all = [primary, headline, description, au, ot, ac, os, ...pts].join("\n");
   if (emojiCount(primary) > AD_LIMITS.emojiMax) add("emoji", `емодзі в основному тексті: ${emojiCount(primary)} (макс ${AD_LIMITS.emojiMax})`);

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { listFactsCore } from "@/lib/factsDb";
 import { seedAdsNetwork } from "@/lib/seedStructures";
 import { AD_PLATFORM_KEY, AD_NETWORK_RULES, AD_CTA_BUTTONS, AD_LIMITS, AD_ASPECTS } from "@/lib/adRules";
+import { AD_BRIEF_CATEGORY, AD_PAIN_CATEGORY, briefReadiness, briefText, parsePains, pickPains, painForFunnel } from "@/lib/adBrief";
 
 // Контекст для воронок рекламних креативів Meta (FB/IG): усе, що креатив має знати про експерта, продукт і ЦА.
 // Єдине джерело правди — content2 (воронка нічого про експерта не зберігає і не вигадує).
@@ -35,12 +36,13 @@ export async function POST(req: NextRequest) {
       ? products.find((p) => p.name.toLowerCase().includes(String(body.productName).toLowerCase()))
       : products[0];
 
-  const [personas, cases, founder, facts, brand, existing] = await Promise.all([
+  const [personas, cases, founder, facts, brand, briefDocs, existing] = await Promise.all([
     prisma.persona.findMany({ where: { projectId } }),
     prisma.case.findMany({ where: { projectId, ...(wanted ? { OR: [{ productId: wanted.id }, { productId: null }] } : {}) } }),
     prisma.founderProfile.findUnique({ where: { projectId } }),
     listFactsCore(projectId, "active"),
     prisma.knowledgeEntry.findMany({ where: { projectId, category: "brand", isActive: true } }),
+    prisma.knowledgeEntry.findMany({ where: { projectId, category: { in: [AD_BRIEF_CATEGORY, AD_PAIN_CATEGORY] }, isActive: true }, orderBy: { createdAt: "asc" } }),
     network
       ? prisma.postGroup.findMany({
           where: { projectId, socialNetworkId: network.id },
@@ -66,10 +68,16 @@ export async function POST(req: NextRequest) {
 
   const prevAds = (existing as any[]).map((g) => {
     const ad = (g.items?.[0]?.funnelParams as any)?.ad || {};
-    return { number: g.number, angle: ad.angle || null, headline: ad.headline || null };
+    return { number: g.number, angle: ad.angle || null, headline: ad.headline || null, pain: ad.pain || null };
   }).filter((a) => a.headline);
 
+  // Рекламний бриф і банк болів (src/lib/adBrief.ts): без них воронка не має права робити креативи.
+  const readiness = briefReadiness(briefDocs);
+  const painBank = parsePains(briefDocs);
+  const suggestedPains = pickPains(painBank, prevAds, 10).map((p, i) => painForFunnel(p, i));
+
   const text = [
+    briefText(briefDocs),
     `КОМПАНІЯ/ЕКСПЕРТ: ${project.name}`,
     founder ? `ЕКСПЕРТ (ядро): ${clip(founder.core, 500)}\nСИЛЬНІ СТОРОНИ: ${JSON.stringify(founder.strengths).slice(0, 600)}\nВІДМІННОСТІ: ${JSON.stringify(founder.differentiators).slice(0, 600)}` : "ЕКСПЕРТ: профілю нема",
     offer
@@ -94,6 +102,10 @@ export async function POST(req: NextRequest) {
     allProducts: products.map((p) => ({ id: p.id, name: p.name })),
     cases: cases.map((c) => ({ id: c.id, title: c.title, allowedClaims: c.allowedClaims })),
     previousAds: prevAds,
+    briefReady: readiness.ready,
+    briefMissing: readiness.missing,
+    painBank: painBank.map((p) => ({ id: p.id, title: p.title, evidence: p.evidence, angle: p.angle || null })),
+    suggestedPains,
     text,
   }, { headers: { "Cache-Control": "no-store" } });
 }

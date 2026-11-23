@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { AD_PLATFORM_KEY } from "@/lib/adRules";
 import { planAdsOrder } from "@/lib/adsOrder";
+import { AD_BRIEF_CATEGORY, AD_PAIN_CATEGORY, briefReadiness } from "@/lib/adBrief";
 
 // Платформа реклами (ads.fineko.space) ↔ контент-платформа. Один вхід, п'ять дій:
 //   ping                          — перевірка ключа, назва проєкту й кількість персон/креативів
@@ -112,6 +113,17 @@ export async function POST(req: NextRequest) {
     // ставлять його в мережу meta_ads (формат ad_*, без черги публікації) і рендерять медіа. route="chat" примусово лишає старий шлях.
     const plan = b.route === "chat" ? null : planAdsOrder({ ...b, text, projectId }, new Date().toISOString().slice(0, 10));
     if (plan) {
+      // Без рекламного брифу й банку болів креативи виходять загальними («рутина», «хаос») і нічого не зачіпають. Зупиняємось і повертаємо питання.
+      if (!b.skipBrief) {
+        const docs = await prisma.knowledgeEntry.findMany({ where: { projectId, category: { in: [AD_BRIEF_CATEGORY, AD_PAIN_CATEGORY] }, isActive: true } });
+        const rd = briefReadiness(docs);
+        if (!rd.ready) {
+          return NextResponse.json({
+            ok: false,
+            error: { code: "BRIEF_INCOMPLETE", message: "Для якісних креативів у базі проєкту не вистачає рекламного брифу або банку болів. Поставте людині ці питання, збережіть відповіді (content2 → База знань → документи брифу) і повторіть замовлення.", details: { missing: rd.missing } },
+          }, { status: 422 });
+        }
+      }
       let fallbackNote = "";
       if (plan.needsPhotos) {
         // «з фото автора»: беремо реальні (не ШІ) фото з бібліотеки проєкту; нема жодного: падаємо на воронку з намальованою картинкою
