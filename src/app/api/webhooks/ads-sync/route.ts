@@ -2,19 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { AD_PLATFORM_KEY } from "@/lib/adRules";
+import { planAdsOrder } from "@/lib/adsOrder";
 
 // Платформа реклами (ads.fineko.space) ↔ контент-платформа. Один вхід, п'ять дій:
 //   ping                          — перевірка ключа, назва проєкту й кількість персон/креативів
 //   personas                      — персони (аудиторії) проєкту
 //   upsert_persona                — створити або оновити персону (аудиторія, створена на платформі реклами)
 //   creatives                     — рекламні креативи проєкту (мережа meta_ads): текст, картинка/відео, статус
-//   order                         — замовити креативи контент-менеджеру (так само, як повідомлення в чаті content2)
+//   order                         — замовити креативи. Рекламне замовлення (за текстом або kind:"creatives") іде у воронки реклами
+//                                   ads-creative-image/-photo/-video (необовʼязкові поля: count, aspects, angles, pains, photoUrls, note, landingUrl, date, render);
+//                                   інше повідомлення, як і раніше, контент-менеджеру (чат content2). route:"chat" примусово лишає шлях через чат
 //   learning                      — записати підсумок тесту зв'язки в базу знань проєкту (контент-менеджер бачить, що працює)
 // Вхід: Authorization: Bearer <ADS_SYNC_KEY>. Окремий ключ лише для цього входу, не системний WEBHOOK_SECRET.
 // Без заданого ADS_SYNC_KEY вхід закритий. Нічого не видаляє.
 export const dynamic = "force-dynamic";
 
-const FLOWS_CM = "https://flows.fineko.space/webhook/bot/content-manager-web";
+const FLOWS_BASE = "https://flows.fineko.space/webhook/bot";
+const FLOWS_CM = `${FLOWS_BASE}/content-manager-web`;
 const clamp = (v: unknown, n: number) => (v === undefined || v === null ? null : String(v).trim().slice(0, n) || null);
 
 function authorized(req: NextRequest): boolean {
@@ -101,6 +105,41 @@ export async function POST(req: NextRequest) {
     const wh = process.env.WEBHOOK_SECRET;
     if (!base || !wh) return fail("MISCONFIGURED", "На сервері content2 не задано NEXTAUTH_URL або WEBHOOK_SECRET", 500);
     const sessionKey = `ads-${Date.now().toString(36)}-${crypto.randomBytes(4).toString("hex")}`;
+
+    // РЕКЛАМНЕ замовлення йде прямо у воронки реклами (ads-creative-image / -photo / -video), а не контент-менеджеру:
+    // його диспетчер і генератор постів не знають мережі meta_ads і робили зі «креативів» звичайні пости Instagram
+    // (текст = лише тема, картинка через fal recraft). Воронки реклами самі пишуть креатив за правилами adRules,
+    // ставлять його в мережу meta_ads (формат ad_*, без черги публікації) і рендерять медіа. route="chat" примусово лишає старий шлях.
+    const plan = b.route === "chat" ? null : planAdsOrder({ ...b, text, projectId }, new Date().toISOString().slice(0, 10));
+    if (plan) {
+      let fallbackNote = "";
+      if (plan.needsPhotos) {
+        // «з фото автора»: беремо реальні (не ШІ) фото з бібліотеки проєкту; нема жодного: падаємо на воронку з намальованою картинкою
+        const media = await prisma.mediaItem.findMany({
+          where: { projectId, aiGenerated: false, mimeType: { startsWith: "image/" }, folder: { in: ["source", "Threads Мацук", "photos", "Фото автора"] } },
+          orderBy: { createdAt: "desc" }, take: 8, select: { filePath: true },
+        });
+        const urls = media.map((m) => abs(m.filePath)).filter(Boolean) as string[];
+        if (urls.length) plan.params.photoUrls = urls;
+        else { plan.funnel = "ads-creative-image"; delete plan.params.photoUrls; fallbackNote = " (у бібліотеці нема реальних фото автора, тому креативи будуть з намальованою картинкою)"; }
+      }
+      if (b.dryRun) return NextResponse.json({ ok: true, data: { dryRun: true, projectId, routedTo: plan.funnel, summary: plan.summary, params: { ...plan.params, note: String(plan.params.note || "").slice(0, 200) } } });
+      const session = await prisma.chatSession.create({ data: { projectId, userId: owner.userId, sessionKey } });
+      await prisma.chatMessage.create({ data: { sessionId: session.id, role: "user", content: text } });
+      let accepted = true;
+      try {
+        const r = await fetch(`${FLOWS_BASE}/${plan.funnel}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(plan.params), signal: AbortSignal.timeout(10000) });
+        accepted = r.ok;
+      } catch (e: any) {
+        accepted = e?.name === "TimeoutError" || e?.name === "AbortError"; // воронка працює асинхронно
+      }
+      const msg = accepted
+        ? `Замовлення на рекламні креативи передано воронці «${plan.funnel}»: ${plan.summary}${fallbackNote}. Креативи зʼявляться в мережі «Реклама FB/IG» (формат ad_*, у чергу публікації не потрапляють); звіт прийде в Telegram.`
+        : `Воронка «${plan.funnel}» не прийняла замовлення. Спробуйте ще раз.`;
+      await prisma.chatMessage.create({ data: { sessionId: session.id, role: "assistant", content: msg } });
+      if (!accepted) return fail("FLOWS_ERROR", `Воронка ${plan.funnel} не прийняла замовлення. Спробуйте ще раз.`, 502);
+      return NextResponse.json({ ok: true, data: { sessionKey, projectId, routedTo: plan.funnel, summary: plan.summary } });
+    }
     const payload = {
       message: text, sessionId: sessionKey, projectId,
       callbackUrl: `${base}/api/webhooks/chat-reply?token=${wh}&sessionKey=${sessionKey}&projectId=${projectId}`,

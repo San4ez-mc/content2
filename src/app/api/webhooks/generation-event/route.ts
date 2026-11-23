@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
     imagePath = videoPath; // post's media pointer (imagePath is the generic media path field)
   }
 
-  const errorMessage = body.errorMessage || body.error || null;
+  let errorMessage = body.errorMessage || body.error || null;
 
   const STATUS_MAP: Record<string, string> = { success: "done", ok: "done", error: "failed" };
   let status: string = body.status;
@@ -208,6 +208,12 @@ export async function POST(req: NextRequest) {
     if (imagePath) status = "done";
     else if (errorMessage) status = "failed";
     else status = "failed";
+  }
+  // «Готово» без медіа це збій: воронка могла проковтнути помилку (напр. fal 403 «баланс вичерпано») і все одно відправити success.
+  // Раніше такий пост лишався generation_status=done без картинки й вважався готовим. Текстові пости (funnelSlug text_only) не чіпаємо.
+  if (status === "done" && !imagePath && postItemId && existingPostItem && !existingPostItem.imagePath && existingPostItem.funnelSlug && existingPostItem.funnelSlug !== "text_only") {
+    status = "failed";
+    errorMessage = errorMessage || "Воронка повернула «готово», але без картинки чи відео (ймовірно, збій генератора: перевірте баланс fal.ai і логи воронки).";
   }
 
   if (postItemId && existingPostItem) {
