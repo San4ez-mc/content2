@@ -29,12 +29,22 @@ export async function POST(req: NextRequest) {
     network = await prisma.socialNetwork.findFirst({ where: { projectId, platformKey: AD_PLATFORM_KEY } });
   }
 
+  // Правила мережі в базі лишились від старої версії (заголовок ≤ 8 слів, а код дозволяє 14 і має плашку «для кого»): копірайтер отримував суперечливі вказівки. Оновлюємо лише застарілу версію.
+  if (network && !String(network.rules || "").includes("плашка «для кого»")) {
+    await prisma.socialNetwork.update({ where: { id: network.id }, data: { rules: AD_NETWORK_RULES } });
+    network = { ...network, rules: AD_NETWORK_RULES };
+  }
+
   const products = await prisma.product.findMany({ where: { projectId, isActive: true }, orderBy: { priority: "asc" }, include: { leadMagnets: { where: { isActive: true } } } });
+  // Який продукт рекламуємо, якщо замовлення його не назвало: той, що названий у розділі брифу «сходинки пропозиції»
+  // (раніше брався перший за пріоритетом, а в проєкті кілька продуктів з пріоритетом 1, тож могла рекламуватись не та пропозиція).
+  const offerDoc = await prisma.knowledgeEntry.findFirst({ where: { projectId, category: AD_BRIEF_CATEGORY, title: "Бриф: сходинки пропозиції", isActive: true }, select: { content: true } });
+  const briefProduct = offerDoc ? products.find((p) => offerDoc.content.toLowerCase().includes(p.name.toLowerCase())) : undefined;
   const wanted = body.productId
     ? products.find((p) => p.id === body.productId)
     : body.productName
       ? products.find((p) => p.name.toLowerCase().includes(String(body.productName).toLowerCase()))
-      : products[0];
+      : briefProduct || products[0];
 
   const [personas, cases, founder, facts, brand, briefDocs, existing] = await Promise.all([
     prisma.persona.findMany({ where: { projectId } }),
