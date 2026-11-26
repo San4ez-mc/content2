@@ -22,7 +22,7 @@ const dry = process.argv.includes('--dry');
 const fixOnly = process.argv.includes('--fix-only');
 const PREFERRED = [9, 12, 15, 18, 20, 10, 13, 16, 19, 11, 14, 17, 21, 8];
 // Хвилина слота за autopostSlug мережі (за замовчуванням '00'). Планувальник ловить слоти :00 (запуск о :03) і :30 (запуск о :33).
-const NETWORK_MINUTE = { 'publish-threads-matsuk': '30' };
+const NETWORK_MINUTE = { 'publish-threads-matsuk': '30', 'publish-instagram-matsuk': '30' };
 const fromArg = (process.argv.find((a) => a.startsWith('--from=')) || '').slice(7);
 const today = fromArg || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
