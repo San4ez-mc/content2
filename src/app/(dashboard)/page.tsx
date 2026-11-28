@@ -3,11 +3,12 @@ import { CalendarView } from "@/components/calendar/CalendarView";
 import { ScheduleBar } from "@/components/schedule/ScheduleBar";
 import { redirect } from "next/navigation";
 import { resolveActiveProject } from "@/lib/tenant";
+import { kyivToday } from "@/lib/utils";
 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: { projectId?: string; month?: string };
+  searchParams: { projectId?: string };
 }) {
   const { user, activeProject } = await resolveActiveProject(searchParams.projectId);
   if (!user) redirect("/login");
@@ -26,9 +27,9 @@ export default async function HomePage({
     );
   }
 
-  // Parse month (YYYY-MM)
-  const now = new Date();
-  const monthStr = searchParams.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  // Календар завжди відкривається на поточному місяці (за Києвом). Гортання живе лише в стані сторінки, не в адресі:
+  // інакше старий ?month= з історії браузера чи після перемикання компанії показував чужий місяць.
+  const monthStr = kyivToday().slice(0, 7);
   const [year, month] = monthStr.split("-").map(Number);
 
   const dateFrom = new Date(year, month - 1, 1);

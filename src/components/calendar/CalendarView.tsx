@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn, PLATFORM_META, STATUS_META } from "@/lib/utils";
 import { PostModal } from "@/components/posts/PostModal";
@@ -57,8 +56,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   tiktok: "#06b6d4",
 };
 
-export function CalendarView({ activeProject, postGroups: initialGroups, socialNetworks, monthStr }: Props) {
-  const router = useRouter();
+export function CalendarView({ activeProject, postGroups: initialGroups, socialNetworks, monthStr: currentMonth }: Props) {
+  const [monthStr, setMonthStr] = useState(currentMonth);
   const queryClient = useQueryClient();
   const [selectedPost, setSelectedPost] = useState<PostGroup | null>(null);
   const [quickCreateDate, setQuickCreateDate] = useState<string | null>(null);
@@ -76,7 +75,8 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
     setQuickCreateDate(null);
     setBulkSelected(new Set());
     setSearch("");
-  }, [activeProject.id]);
+    setMonthStr(currentMonth);
+  }, [activeProject.id, currentMonth]);
 
   async function handleDropOnDate(postId: string, targetDate: string) {
     await fetch(`/api/posts/${postId}`, {
@@ -90,15 +90,17 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
   const [year, month] = monthStr.split("-").map(Number);
 
   // Fetch posts via React Query (refreshable)
-  const { data: postGroups = initialGroups } = useQuery<PostGroup[]>({
+  const { data: postGroups = [] } = useQuery<PostGroup[]>({
     queryKey: ["postGroups", activeProject.id, monthStr],
     queryFn: async () => {
       const r = await fetch(
         `/api/posts?projectId=${activeProject.id}&month=${monthStr}`
       );
+      if (!r.ok) throw new Error("posts " + r.status);
       return r.json();
     },
-    initialData: initialGroups,
+    // Сервер віддає пости лише поточного місяця; для інших місяців чекаємо відповідь API.
+    initialData: monthStr === currentMonth ? initialGroups : undefined,
     staleTime: 10_000,
   });
 
@@ -194,12 +196,12 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
 
   function prevMonth() {
     const d = new Date(year, month - 2);
-    router.push(`/?month=${format(d, "yyyy-MM")}`);
+    setMonthStr(format(d, "yyyy-MM"));
   }
 
   function nextMonth() {
     const d = new Date(year, month);
-    router.push(`/?month=${format(d, "yyyy-MM")}`);
+    setMonthStr(format(d, "yyyy-MM"));
   }
 
   const isAdsNetwork = socialNetworks.find((n) => n.id === activeNetwork)?.platformKey === "meta_ads";
@@ -215,7 +217,7 @@ export function CalendarView({ activeProject, postGroups: initialGroups, socialN
             {format(new Date(year, month - 1), "LLLL yyyy", { locale: uk })}
           </span>
           <button onClick={nextMonth} className="btn-ghost px-2 py-1">›</button>
-          <button onClick={() => router.push("/")} className="btn-ghost px-2 py-1 text-xs" title="Повернутись до поточного місяця">Сьогодні</button>
+          <button onClick={() => setMonthStr(currentMonth)} className="btn-ghost px-2 py-1 text-xs" title="Повернутись до поточного місяця">Сьогодні</button>
         </div>
 
         <div className="w-px h-4 bg-border" />
